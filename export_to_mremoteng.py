@@ -111,7 +111,8 @@ def parse_devices(xml_data, device_categories=None, models=None):
             if not is_match:
                 continue
             
-        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model})
+        serial_number = ap_el.findtext('serial_number') or ""
+        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
     return devices
 
 def build_tree(folders, devices):
@@ -173,21 +174,27 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                                   Descr="",
                                   Icon="mRemoteNG",
                                   Panel="General",
-                                  Expanded="false")
+                                  Expanded="false",
+                                  Protocol="SSH2",
+                                  Port="22",
+                                  PuttySession="Default Settings")
         
-        # Add subfolders recursively
-        for sub_id in fdata['subfolders']:
+        # Add subfolders recursively (alphabetically sorted)
+        for sub_id in sorted(fdata['subfolders'], key=lambda x: folders[x]['name'].lower()):
             add_node(container, sub_id)
             
         # Add devices
         for dev in fdata['devices']:
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
+            descr = dev['model'].strip()
+            if dev['serial_number']:
+                descr += f" (S/N: {dev['serial_number']})"
             # Some essential properties to prevent mRemoteNG from complaining
             ET.SubElement(container, "Node", 
                           Name=dev_name, 
                           Type="Connection", 
                           Id=str(uuid.uuid4()),
-                          Descr=dev['model'],
+                          Descr=descr,
                           Icon="mRemoteNG",
                           Panel="General",
                           Hostname=dev['ip'] or "", 
@@ -199,8 +206,12 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                           Password="",
                           MacAddress="",
                           UserField="")
+                          
+        # If the folder has no devices and no subfolders, remove it
+        if len(container) == 0:
+            parent_el.remove(container)
 
-    for rf in root_folders:
+    for rf in sorted(root_folders, key=lambda x: folders[x]['name'].lower() if x in folders else x):
         add_node(root, rf)
         
     tree = ET.ElementTree(root)
