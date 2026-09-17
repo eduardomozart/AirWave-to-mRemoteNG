@@ -11,6 +11,9 @@ def parse_args():
     """
     Auxiliary function to handle command-line arguments.
     """
+    if '/?' in sys.argv:
+        sys.argv[sys.argv.index('/?')] = '-h'
+
     parser = argparse.ArgumentParser(description="Export AirWave switches to mRemoteNG XML format.")
     parser.add_argument('-i', '--ip', required=True, help="AirWave Server IP or Hostname")
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
@@ -22,7 +25,7 @@ def parse_args():
     try:
         args = parser.parse_args()
     except SystemExit:
-        print("\nWarning: Missing required arguments. Please provide --ip, --username, and --password.")
+        print("\nError: Missing required arguments. Please provide --ip, --username, and --password.")
         sys.exit(1)
         
     return args
@@ -197,14 +200,14 @@ def main():
         print("\n--- [DRY RUN] folder_list.xml ---")
         folder_xml = aw.command(apiPath='/folder_list.xml')
         if folder_xml:
-            print(folder_xml[:500] + "\n... (truncated)")
+            print(folder_xml)
         else:
             print("Failed to get folder list")
 
         print("\n--- [DRY RUN] ap_list.xml ---")
         ap_xml = aw.command(apiPath='/ap_list.xml')
         if ap_xml:
-            print(ap_xml[:1000] + "\n... (truncated)")
+            print(ap_xml)
         else:
             print("Failed to get AP list")
             
