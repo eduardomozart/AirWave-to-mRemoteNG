@@ -167,19 +167,75 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                       Protected="zjEfDtvs6NSdcjGiMNojrC9xfCJPE1VXBPJbqqAMBxKn+yKU4FCwZkvhnUSG/wb5+N10GTtNpU2XaZ8rIul+8gQK",
                       ConfVersion="2.6")
     
+    # Full set of default attributes expected by mRemoteNG's deserializer.
+    # Omitting any of these can cause a NullReferenceException on import.
+    DEFAULT_PROPS = dict(
+        Username="", Domain="", Password="", Hostname="",
+        Protocol="SSH2", PuttySession="Default Settings", Port="22",
+        ConnectToConsole="false", UseCredSsp="true", RenderingEngine="IE",
+        ICAEncryptionStrength="EncrBasic", RDPAuthenticationLevel="NoAuth",
+        RDPMinutesToIdleTimeout="0", RDPAlertIdleTimeout="false",
+        LoadBalanceInfo="", Colors="Colors16Bit", Resolution="FitToWindow",
+        AutomaticResize="true", DisplayWallpaper="false", DisplayThemes="false",
+        EnableFontSmoothing="false", EnableDesktopComposition="false",
+        CacheBitmaps="false", RedirectDiskDrives="false", RedirectPorts="false",
+        RedirectPrinters="false", RedirectSmartCards="false",
+        RedirectSound="DoNotPlay", SoundQuality="Dynamic", RedirectKeys="false",
+        Connected="false", PreExtApp="", PostExtApp="", MacAddress="",
+        UserField="", ExtApp="",
+        VNCCompression="CompNone", VNCEncoding="EncHextile",
+        VNCAuthMode="AuthVNC", VNCProxyType="ProxyNone", VNCProxyIP="",
+        VNCProxyPort="0", VNCProxyUsername="", VNCProxyPassword="",
+        VNCColors="ColNormal", VNCSmartSizeMode="SmartSAspect", VNCViewOnly="false",
+        RDGatewayUsageMethod="Never", RDGatewayHostname="",
+        RDGatewayUseConnectionCredentials="Yes", RDGatewayUsername="",
+        RDGatewayPassword="", RDGatewayDomain="",
+        InheritCacheBitmaps="false", InheritColors="false",
+        InheritDescription="false", InheritDisplayThemes="false",
+        InheritDisplayWallpaper="false", InheritEnableFontSmoothing="false",
+        InheritEnableDesktopComposition="false", InheritDomain="false",
+        InheritIcon="false", InheritPanel="false", InheritPassword="false",
+        InheritPort="false", InheritProtocol="false", InheritPuttySession="false",
+        InheritRedirectDiskDrives="false", InheritRedirectKeys="false",
+        InheritRedirectPorts="false", InheritRedirectPrinters="false",
+        InheritRedirectSmartCards="false", InheritRedirectSound="false",
+        InheritSoundQuality="false", InheritResolution="false",
+        InheritAutomaticResize="false", InheritUseConsoleSession="false",
+        InheritUseCredSsp="false", InheritRenderingEngine="false",
+        InheritUsername="false", InheritICAEncryptionStrength="false",
+        InheritRDPAuthenticationLevel="false",
+        InheritRDPMinutesToIdleTimeout="false", InheritRDPAlertIdleTimeout="false",
+        InheritLoadBalanceInfo="false", InheritPreExtApp="false",
+        InheritPostExtApp="false", InheritMacAddress="false",
+        InheritUserField="false", InheritExtApp="false",
+        InheritVNCCompression="false", InheritVNCEncoding="false",
+        InheritVNCAuthMode="false", InheritVNCProxyType="false",
+        InheritVNCProxyIP="false", InheritVNCProxyPort="false",
+        InheritVNCProxyUsername="false", InheritVNCProxyPassword="false",
+        InheritVNCColors="false", InheritVNCSmartSizeMode="false",
+        InheritVNCViewOnly="false", InheritRDGatewayUsageMethod="false",
+        InheritRDGatewayHostname="false",
+        InheritRDGatewayUseConnectionCredentials="false",
+        InheritRDGatewayUsername="false", InheritRDGatewayPassword="false",
+        InheritRDGatewayDomain="false",
+    )
+
     def add_node(parent_el, folder_id):
         fdata = folders[folder_id]
-        container = ET.SubElement(parent_el, "Node", 
-                                  Name=fdata['name'], 
-                                  Type="Container", 
-                                  Id=str(uuid.uuid4()),
-                                  Descr="",
-                                  Icon="mRemoteNG",
-                                  Panel="General",
-                                  Expanded="false",
-                                  Protocol="SSH2",
-                                  Port="22",
-                                  PuttySession="Default Settings")
+        attrs = dict(DEFAULT_PROPS)
+        attrs.update(
+            Name=fdata['name'],
+            Type="Container",
+            Id=str(uuid.uuid4()),
+            Descr="",
+            Icon="mRemoteNG",
+            Panel="General",
+            Expanded="false",
+            Protocol="SSH2",
+            Port="22",
+            PuttySession="Default Settings",
+        )
+        container = ET.SubElement(parent_el, "Node", **attrs)
         
         # Add subfolders recursively (alphabetically sorted)
         for sub_id in sorted(fdata['subfolders'], key=lambda x: folders[x]['name'].lower()):
@@ -190,24 +246,21 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
             descr = dev['model'].strip()
             if dev['serial_number']:
-                descr += f" (S/N: {dev['serial_number']})"
-            # Some essential properties to prevent mRemoteNG from complaining
-            ET.SubElement(container, "Node", 
-                          Name=dev_name, 
-                          Type="Connection", 
-                          Id=str(uuid.uuid4()),
-                          Descr=descr,
-                          Icon="mRemoteNG",
-                          Panel="General",
-                          Hostname=dev['ip'] or "", 
-                          Protocol="SSH2", 
-                          Port="22",
-                          PuttySession="Default Settings",
-                          Username="",
-                          Domain="",
-                          Password="",
-                          MacAddress="",
-                          UserField="")
+                descr += f" (S/N: {dev['serial_number'].strip()})"
+            dev_attrs = dict(DEFAULT_PROPS)
+            dev_attrs.update(
+                Name=dev_name,
+                Type="Connection",
+                Id=str(uuid.uuid4()),
+                Descr=descr,
+                Icon="mRemoteNG",
+                Panel="General",
+                Hostname=dev['ip'] or "",
+                Protocol="SSH2",
+                Port="22",
+                PuttySession="Default Settings",
+            )
+            ET.SubElement(container, "Node", **dev_attrs)
                           
         # If the folder has no devices and no subfolders, remove it
         if len(container) == 0:
