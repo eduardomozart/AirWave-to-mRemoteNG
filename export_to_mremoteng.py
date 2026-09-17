@@ -75,7 +75,9 @@ def parse_devices(xml_data, device_categories=None, models=None):
         return []
 
     devices = []
+    total_devices = 0
     for ap_el in root.iter('ap'):
+        total_devices += 1
         name = ap_el.findtext('name')
         if name and name.strip().startswith("(id:"):
             continue
@@ -113,7 +115,7 @@ def parse_devices(xml_data, device_categories=None, models=None):
             
         serial_number = ap_el.findtext('serial_number') or ""
         devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
-    return devices
+    return devices, total_devices
 
 def build_tree(folders, devices):
     """
@@ -269,8 +271,8 @@ def main():
         for item in args.model:
             models.append(item.strip())
 
-    devices = parse_devices(ap_xml, device_categories if device_categories else None, models if models else None)
-    print(f"Parsed {len(devices)} devices.")
+    devices, total_devices = parse_devices(ap_xml, device_categories if device_categories else None, models if models else None)
+    print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
     
     print("Building folder hierarchy...")
     root_folders = build_tree(folders, devices)
