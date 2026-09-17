@@ -121,22 +121,42 @@ def parse_devices(xml_data, device_categories=None, models=None):
 
 def flatten_folders_by_category(folders, devices, device_categories):
     """
-    Removes folders that exactly match the provided device categories.
-    Reassigns their devices and subfolders to the nearest kept parent folder.
+    Removes folders that exactly match the provided device categories, EXCEPT 
+    when a parent folder contains multiple categories (e.g. both 'Switch' and 'Access Point').
+    Reassigns flattened devices and subfolders to the nearest kept parent folder.
     """
     if not device_categories:
         return
 
-    folders_to_remove = set()
+    candidate_folders = set()
     
-    # Identify folders whose names exactly match the passed-in device categories (case-insensitive)
+    # Identify all folders whose names exactly match the passed-in device categories (case-insensitive)
     for fid, fdata in folders.items():
         name_lower = fdata['name'].strip().lower()
         for cat in device_categories:
             if cat.lower() == name_lower:
-                folders_to_remove.add(fid)
+                candidate_folders.add(fid)
                 break
-            
+                
+    if not candidate_folders:
+        return
+
+    # Group these candidate folders by their parent_id
+    parent_to_candidates = {}
+    for fid in candidate_folders:
+        pid = folders[fid].get('parent_id')
+        if pid not in parent_to_candidates:
+            parent_to_candidates[pid] = []
+        parent_to_candidates[pid].append(fid)
+
+    folders_to_remove = set()
+    
+    # Only flag for removal if it's the ONLY matched category folder under that parent
+    for pid, sibling_fids in parent_to_candidates.items():
+        if len(sibling_fids) == 1:
+            folders_to_remove.add(sibling_fids[0])
+        # If len >= 2, we leave them alone so they don't merge into a mess
+
     if not folders_to_remove:
         return
 
