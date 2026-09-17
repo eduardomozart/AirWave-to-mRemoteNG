@@ -14,10 +14,12 @@ FLATTENED_FOLDER_RULES = (
     {
         'allowed_tokens': {"switch", "switches", "device", "devices"},
         'required_token_groups': ({"switch", "switches"},),
+        'category_terms': ("switch",),
     },
     {
         'allowed_tokens': {"access", "point", "points", "device", "devices"},
         'required_token_groups': ({"access"}, {"point", "points"}),
+        'category_terms': ("thin_ap", "access point", "access points", "ap"),
     },
 )
 
@@ -130,33 +132,56 @@ def parse_devices(xml_data, device_categories=None, models=None):
         devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
     return devices, total_devices
 
-def should_flatten_folder(folder_name):
+def normalize_device_categories(device_categories):
     """
-    Returns True when the folder should be flattened into its parent.
+    Normalizes device category filters for folder flattening checks.
+    """
+    if not device_categories:
+        return []
+
+    return [category.strip().lower() for category in device_categories if category and category.strip()]
+
+def get_flatten_rule(folder_name):
+    """
+    Returns the flattening rule for the folder, when it matches a known category container.
     """
     folder_tokens = set(re.findall(r"[a-z0-9]+", (folder_name or "").lower()))
     if not folder_tokens:
-        return False
+        return None
 
     for rule in FLATTENED_FOLDER_RULES:
         if folder_tokens <= rule['allowed_tokens'] and all(
             any(token in folder_tokens for token in token_group)
             for token_group in rule['required_token_groups']
         ):
-            return True
+            return rule
 
-    return False
+    return None
 
-def get_flattened_folders(folders, flatten_category_folders=False):
+def should_flatten_folder(folder_name, device_categories=None):
+    """
+    Returns True when the folder should be flattened into its parent.
+    """
+    rule = get_flatten_rule(folder_name)
+    if not rule:
+        return False
+
+    normalized_categories = normalize_device_categories(device_categories)
+    return any(
+        any(term in category or category in term for term in rule['category_terms'])
+        for category in normalized_categories
+    )
+
+def get_flattened_folders(folders, device_categories=None):
     """
     Returns the set of folder IDs that are candidates for flattening.
     """
-    if not flatten_category_folders:
+    if not device_categories:
         return set()
 
     return {
         fid for fid, fdata in folders.items()
-        if should_flatten_folder(fdata['name'])
+        if should_flatten_folder(fdata['name'], device_categories)
     }
 
 def resolve_folder_id(folder_id, folders, flattened_folders):
@@ -176,13 +201,13 @@ def resolve_folder_id(folder_id, folders, flattened_folders):
 
     return current_folder_id
 
-def build_tree(folders, devices, flatten_category_folders=False):
+def build_tree(folders, devices, device_categories=None):
     """
     Links subfolders to their parents and assigns devices to folders.
     Returns a list of root folder IDs.
     """
     root_folders = []
-    flattened_folders = get_flattened_folders(folders, flatten_category_folders)
+    flattened_folders = get_flattened_folders(folders, device_categories)
 
     for fdata in folders.values():
         fdata['subfolders'] = []
@@ -400,9 +425,8 @@ def main():
     print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
     
     print("Building folder hierarchy...")
-    flatten_category_folders = bool(device_categories)
-    flattened_folders = get_flattened_folders(folders, flatten_category_folders)
-    root_folders = build_tree(folders, devices, flatten_category_folders=flatten_category_folders)
+    flattened_folders = get_flattened_folders(folders, device_categories)
+    root_folders = build_tree(folders, devices, device_categories=device_categories)
     
     airwave_folders = []
     if args.airwave_folder:
