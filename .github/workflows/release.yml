@@ -1,5 +1,5 @@
 name: Build and Release Windows Binary
-
+run-name: Release ${{ github.ref_name }}
 on:
   push:
     tags:
