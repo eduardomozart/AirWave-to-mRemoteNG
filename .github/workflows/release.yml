@@ -27,6 +27,10 @@ jobs:
         pip install pyinstaller
         pip install git+https://github.com/eduardomozart/pyairwave.git
 
+    - name: Inject Version
+      run: |
+        (Get-Content export_to_mremoteng.py) -replace 'VERSION = "DEV_BUILD"', "VERSION = `"${{ github.ref_name }}`"" | Set-Content export_to_mremoteng.py
+
     - name: Build executable
       run: |
         pyinstaller --onefile export_to_mremoteng.py

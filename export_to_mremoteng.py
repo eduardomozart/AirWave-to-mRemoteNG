@@ -7,6 +7,8 @@ import sys
 
 urllib3.disable_warnings()
 
+VERSION = "DEV_BUILD"
+
 def parse_args():
     """
     Auxiliary function to handle command-line arguments.
@@ -14,7 +16,8 @@ def parse_args():
     if '/?' in sys.argv:
         sys.argv[sys.argv.index('/?')] = '-h'
 
-    parser = argparse.ArgumentParser(description="Export AirWave switches to mRemoteNG XML format.")
+    parser = argparse.ArgumentParser(description=f"Export AirWave switches to mRemoteNG XML format. (Version: {VERSION})")
+    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     parser.add_argument('-i', '--ip', required=True, help="AirWave Server IP or Hostname")
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
