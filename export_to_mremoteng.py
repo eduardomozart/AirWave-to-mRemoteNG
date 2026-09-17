@@ -119,6 +119,50 @@ def parse_devices(xml_data, device_categories=None, models=None):
         devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
     return devices, total_devices
 
+def flatten_folders_by_category(folders, devices, device_categories):
+    """
+    Removes folders that exactly match the provided device categories.
+    Reassigns their devices and subfolders to the nearest kept parent folder.
+    """
+    if not device_categories:
+        return
+
+    folders_to_remove = set()
+    
+    # Identify folders whose names exactly match the passed-in device categories
+    for fid, fdata in folders.items():
+        name_lower = fdata['name'].strip().lower()
+        for cat in device_categories:
+            if cat.lower() == name_lower:
+                folders_to_remove.add(fid)
+                break
+            
+    if not folders_to_remove:
+        return
+
+    def get_kept_parent(fid):
+        curr = fid
+        while curr in folders_to_remove:
+            p = folders[curr].get('parent_id')
+            if not p or p not in folders:
+                return None
+            curr = p
+        return curr
+
+    # Reassign devices to the nearest kept parent
+    for dev in devices:
+        if dev['folder_id'] in folders_to_remove:
+            dev['folder_id'] = get_kept_parent(dev['folder_id'])
+
+    # Reassign child folders to the nearest kept parent
+    for fid, fdata in list(folders.items()):
+        if fid not in folders_to_remove and fdata['parent_id'] in folders_to_remove:
+            fdata['parent_id'] = get_kept_parent(fdata['parent_id'])
+
+    # Remove bypassed folders entirely so they don't get imported
+    for fid in folders_to_remove:
+        del folders[fid]
+
 def build_tree(folders, devices):
     """
     Links subfolders to their parents and assigns devices to folders.
@@ -328,6 +372,8 @@ def main():
 
     devices, total_devices = parse_devices(ap_xml, device_categories if device_categories else None, models if models else None)
     print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
+    
+    flatten_folders_by_category(folders, devices, device_categories)
     
     print("Building folder hierarchy...")
     root_folders = build_tree(folders, devices)
