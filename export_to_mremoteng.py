@@ -18,15 +18,15 @@ def parse_args():
         sys.argv[sys.argv.index('/?')] = '-h'
 
     parser = argparse.ArgumentParser(description=f"Export AirWave switches to mRemoteNG XML format. (Version: {VERSION})")
-    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     parser.add_argument('-i', '--ip', required=True, help="AirWave Server IP or Hostname")
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
     parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times.")
-    parser.add_argument('-t', '--dry-run', action='store_true', help="Only test the AirWave connection and print raw XML fields (does not create an XML file)")
-    parser.add_argument('-d', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
+    parser.add_argument('-c', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
     parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times.")
+    parser.add_argument('-d', '--debug', action='store_true', help="Print raw XML payloads from AirWave API to the console before generating the mRemoteNG file.")
+    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     try:
         args = parser.parse_args()
     except SystemExit:
@@ -235,29 +235,15 @@ def main():
     print("Initializing AirWave API connection...")
     aw = ArubaAirwave(aw_info, ssl_verify=False)
     
-    if args.dry_run:
-        print("\n--- [DRY RUN] folder_list.xml ---")
-        folder_xml = aw.command(apiPath='/folder_list.xml')
-        if folder_xml:
-            print(folder_xml)
-        else:
-            print("Failed to get folder list")
-
-        print("\n--- [DRY RUN] ap_list.xml ---")
-        ap_xml = aw.command(apiPath='/ap_list.xml')
-        if ap_xml:
-            print(ap_xml)
-        else:
-            print("Failed to get AP list")
-            
-        print("\nDry run complete. Exiting without generating mRemoteNG XML.")
-        return
-
     print("Fetching folder list from AirWave... (this might take a moment)")
     folder_xml = aw.get_folder_list()
     if not folder_xml:
         print("Error: Received empty response for folder list.")
         return
+        
+    if args.debug:
+        print("\n--- [DEBUG] folder_list.xml ---")
+        print(folder_xml)
         
     folders = parse_folders(folder_xml)
     print(f"Parsed {len(folders)} folders.")
@@ -268,6 +254,10 @@ def main():
     if not ap_xml:
         print("Error: Received empty response for AP list.")
         return
+        
+    if args.debug:
+        print("\n--- [DEBUG] ap_list.xml ---")
+        print(ap_xml)
         
     device_categories = []
     if args.device_category:
