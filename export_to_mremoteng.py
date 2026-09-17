@@ -19,9 +19,11 @@ def parse_args():
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
-    parser.add_argument('-m', '--master-folder', help="Wrap all exported nodes in a master folder with this name (e.g., 'AirWave Sync')")
+    parser.add_argument('-n', '--mremoteng-folder', help="Wrap all exported nodes in a master folder with this name (e.g., 'AirWave Sync')")
+    parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times or comma-separated.")
     parser.add_argument('-t', '--dry-run', action='store_true', help="Only test the AirWave connection and print raw XML fields (does not create an XML file)")
-    parser.add_argument('-d', '--device-category', help="Filter devices by category separated by comma (e.g. 'switch,ap')")
+    parser.add_argument('-d', '--device-category', action='append', help="Filter devices by category. Can be specified multiple times or comma-separated.")
+    parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times or comma-separated.")
     try:
         args = parser.parse_args()
     except SystemExit:
@@ -55,7 +57,7 @@ def parse_folders(xml_data):
             }
     return folders
 
-def parse_devices(xml_data, device_categories=None):
+def parse_devices(xml_data, device_categories=None, models=None):
     """
     Parses ap_detail.xml to extract devices (APs).
     Returns a list of dicts: [{'name': ..., 'ip': ..., 'folder_id': ...}, ...]
@@ -82,17 +84,22 @@ def parse_devices(xml_data, device_categories=None):
         device_category = ap_el.findtext('device_category')
         model = ap_el.findtext('model')
         
-        # If device_categories is provided, filter by it. Otherwise, include all.
-        if device_categories:
+        # If filters are provided, check if either matches. Otherwise include all.
+        if device_categories or models:
             is_match = False
-            for cat in device_categories:
-                cat_lower = cat.strip().lower()
-                if device_category and cat_lower in device_category.lower():
-                    is_match = True
-                    break
-                if model and cat_lower in model.lower():
-                    is_match = True
-                    break
+            
+            if device_categories and device_category:
+                for cat in device_categories:
+                    if cat.strip().lower() in device_category.lower():
+                        is_match = True
+                        break
+                        
+            if not is_match and models and model:
+                for m in models:
+                    if m.strip().lower() in model.lower():
+                        is_match = True
+                        break
+                        
             if not is_match:
                 continue
             
@@ -134,17 +141,17 @@ def build_tree(folders, devices):
             
     return root_folders
 
-def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml", master_folder_name=None):
+def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml", mremoteng_folder_name=None):
     """
     Generates mRemoteNG compatible XML file.
     """
     root = ET.Element("Connections", Name="Connections", Export="False", ConfVersion="2.6")
     
-    # If a master folder name is provided, wrap everything inside it. Otherwise, attach directly to root.
+    # If a mremoteng folder name is provided, wrap everything inside it. Otherwise, attach directly to root.
     target_parent = root
-    if master_folder_name:
+    if mremoteng_folder_name:
         target_parent = ET.SubElement(root, "Node", 
-                                      Name=master_folder_name, 
+                                      Name=mremoteng_folder_name, 
                                       Type="Container", 
                                       Expanded="True")
     
@@ -230,18 +237,42 @@ def main():
         print("Error: Received empty response for AP list.")
         return
         
-    device_categories = None
+    device_categories = []
     if args.device_category:
-        device_categories = args.device_category.split(',')
+        for item in args.device_category:
+            device_categories.extend([cat.strip() for cat in item.split(',') if cat.strip()])
 
-    devices = parse_devices(ap_xml, device_categories)
+    models = []
+    if args.model:
+        for item in args.model:
+            models.extend([m.strip() for m in item.split(',') if m.strip()])
+
+    devices = parse_devices(ap_xml, device_categories if device_categories else None, models if models else None)
     print(f"Parsed {len(devices)} devices.")
     
     print("Building folder hierarchy...")
     root_folders = build_tree(folders, devices)
     
+    airwave_folders = []
+    if args.airwave_folder:
+        for item in args.airwave_folder:
+            airwave_folders.extend([f.strip() for f in item.split(',') if f.strip()])
+            
+    if airwave_folders:
+        filtered_roots = []
+        for fid, fdata in folders.items():
+            # Check if this folder's name matches any of the requested folders (case-insensitive)
+            for awf in airwave_folders:
+                if awf.lower() == fdata['name'].lower():
+                    filtered_roots.append(fid)
+                    break
+        if not filtered_roots:
+            print("Warning: None of the specified AirWave folders were found.")
+            return
+        root_folders = filtered_roots
+    
     out_file = args.output
-    create_mremoteng_xml(folders, root_folders, out_file, args.master_folder)
+    create_mremoteng_xml(folders, root_folders, out_file, args.mremoteng_folder)
     print("Process complete.")
 
 if __name__ == "__main__":
