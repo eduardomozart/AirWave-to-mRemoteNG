@@ -293,7 +293,7 @@ def main():
         root_folders = filtered_roots
     
     out_file = args.output
-    create_mremoteng_xml(folders, root_folders, out_file, args.mremoteng_folder)
+    create_mremoteng_xml(folders, root_folders, out_file)
     print("Process complete.")
 
 if __name__ == "__main__":

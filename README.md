@@ -27,7 +27,6 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 | `--username` | `-u` | **Yes** | Your AirWave API Administrator username. |
 | `--password` | `-p` | **Yes** | Your AirWave API Administrator password. |
 | `--output` | `-o` | No | Custom filename for the output XML. (Default: `mRemoteNG_AirWave.xml`) |
-| `--mremoteng-folder` | `-n` | No | Wraps all exported items in a root folder with this name (e.g., `"AirWave Sync"`). Highly recommended to make updating and deleting duplicates in mRemoteNG easier. |
 | `--airwave-folder` | `-f` | No | Filter by AirWave folder name (recursive). Can be passed multiple times or comma-separated. Exports all folders by default. |
 | `--device-category` | `-d` | No | Filter by `<device_category>` (e.g. `switch,thin_ap`). Can be passed multiple times (e.g. `-d switch -d thin_ap`) or comma-separated. Exports everything by default. |
 | `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times or comma-separated. |
@@ -36,14 +35,14 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 
 ### Example
 ```powershell
-python export_to_mremoteng.py -i 10.0.0.5 -u admin -p SecretPass123 -n "AirWave Sync" -o my_network.xml
+python export_to_mremoteng.py -i 10.0.0.5 -u admin -p SecretPass123 -o my_network.xml
 ```
 
 ## How to Update mRemoteNG
 Because mRemoteNG relies on unique GUIDs and **does not merge or update** existing imported entries natively, the best workflow for keeping your connections up to date is:
-1. Run this script with the `-n "AirWave Sync"` argument.
-2. In mRemoteNG, right-click and **delete** the old `AirWave Sync` folder.
-3. Go to **File -> Import -> Import from File** and select your newly generated XML to bring in the fresh hierarchy.
+1. Run this script.
+2. In mRemoteNG, right-click and **delete** the old imported folder.
+3. Go to **File -> Import -> Import from File** and select your newly generated XML to bring in the fresh hierarchy. mRemoteNG will automatically create a subfolder for the imported items.
 
 ## How to Create a Windows Binary
 
