@@ -213,7 +213,11 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         
     tree = ET.ElementTree(root)
     ET.indent(tree, space="    ", level=0)
-    tree.write(out_path, encoding="utf-8", xml_declaration=True)
+    xml_str = ET.tostring(root, encoding="utf-8").decode("utf-8")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="utf-8"?>\n')
+        f.write(xml_str)
+        
     print(f"File successfully created: {os.path.abspath(out_path)}")
 
 def main():
