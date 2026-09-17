@@ -33,12 +33,12 @@ jobs:
 
     - name: Build executable
       run: |
-        pyinstaller --onefile export_to_mremoteng.py
+        pyinstaller --onefile --name export_to_mremoteng-x64 export_to_mremoteng.py
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        files: dist/export_to_mremoteng.exe
+        files: dist/export_to_mremoteng-x64.exe
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
