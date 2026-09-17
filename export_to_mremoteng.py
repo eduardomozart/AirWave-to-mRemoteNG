@@ -14,14 +14,20 @@ FLATTENED_FOLDER_RULES = (
     {
         'allowed_tokens': {"switch", "switches", "device", "devices"},
         'required_token_groups': ({"switch", "switches"},),
-        'category_terms': ("switch",),
+        'category_terms': {"switch", "switches"},
     },
     {
         'allowed_tokens': {"access", "point", "points", "device", "devices"},
         'required_token_groups': ({"access"}, {"point", "points"}),
-        'category_terms': ("thin_ap", "access point", "access points", "ap"),
+        'category_terms': {"thin ap", "access point", "access points", "ap"},
     },
 )
+
+def normalize_category_term(category):
+    """
+    Normalizes a device category term for exact comparisons.
+    """
+    return re.sub(r"[^a-z0-9]+", " ", (category or "").lower()).strip()
 
 def parse_args():
     """
@@ -137,9 +143,14 @@ def normalize_device_categories(device_categories):
     Normalizes device category filters for folder flattening checks.
     """
     if not device_categories:
-        return []
+        return set()
 
-    return [category.strip().lower() for category in device_categories if category and category.strip()]
+    normalized_categories = set()
+    for category in device_categories:
+        normalized_category = normalize_category_term(category)
+        if normalized_category:
+            normalized_categories.add(normalized_category)
+    return normalized_categories
 
 def get_flatten_rule(folder_name):
     """
@@ -167,10 +178,8 @@ def should_flatten_folder(folder_name, device_categories=None):
         return False
 
     normalized_categories = normalize_device_categories(device_categories)
-    return any(
-        any(term in category or category in term for term in rule['category_terms'])
-        for category in normalized_categories
-    )
+    normalized_terms = {normalize_category_term(term) for term in rule['category_terms']}
+    return bool(normalized_categories & normalized_terms)
 
 def get_flattened_folders(folders, device_categories=None):
     """
@@ -233,6 +242,7 @@ def build_tree(folders, devices, device_categories=None):
     # Assign devices
     for dev in devices:
         fid = resolve_folder_id(dev['folder_id'], folders, flattened_folders)
+        dev['effective_folder_id'] = fid
         if fid in folders:
             folders[fid]['devices'].append(dev)
         else:
@@ -362,7 +372,7 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
              
         # Add devices (alphabetically sorted)
         for dev in sorted(fdata['devices'], key=lambda x: (x['name'] or x['ip'] or "").lower()):
-            if scoped_folder_ids is not None and dev['folder_id'] not in scoped_folder_ids:
+            if scoped_folder_ids is not None and dev.get('effective_folder_id') not in scoped_folder_ids and dev['folder_id'] not in scoped_folder_ids:
                 continue
 
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
