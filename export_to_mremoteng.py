@@ -10,11 +10,16 @@ import re
 urllib3.disable_warnings()
 
 VERSION = "DEV_BUILD"
-FLATTENED_FOLDER_LABELS = (
-    {"switch", "switches"},
-    {"access", "point", "points"},
+FLATTENED_FOLDER_RULES = (
+    {
+        'allowed_tokens': {"switch", "switches", "device", "devices"},
+        'required_token_groups': ({"switch", "switches"},),
+    },
+    {
+        'allowed_tokens': {"access", "point", "points", "device", "devices"},
+        'required_token_groups': ({"access"}, {"point", "points"}),
+    },
 )
-FLATTENED_FOLDER_GENERIC_WORDS = {"device", "devices"}
 
 def parse_args():
     """
@@ -133,8 +138,11 @@ def should_flatten_folder(folder_name):
     if not folder_tokens:
         return False
 
-    for label_tokens in FLATTENED_FOLDER_LABELS:
-        if label_tokens & folder_tokens and folder_tokens <= (label_tokens | FLATTENED_FOLDER_GENERIC_WORDS):
+    for rule in FLATTENED_FOLDER_RULES:
+        if folder_tokens <= rule['allowed_tokens'] and all(
+            any(token in folder_tokens for token in token_group)
+            for token_group in rule['required_token_groups']
+        ):
             return True
 
     return False
