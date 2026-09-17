@@ -157,6 +157,7 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                       BlockCipherMode="GCM",
                       KdfIterations="1000",
                       FullFileEncryption="false",
+                      Protected="zjEfDtvs6NSdcjGiMNojrC9xfCJPE1VXBPJbqqAMBxKn+yKU4FCwZkvhnUSG/wb5+N10GTtNpU2XaZ8rIul+8gQK",
                       ConfVersion="2.6")
     
     # If a mremoteng folder name is provided, wrap everything inside it. Otherwise, attach directly to root.
