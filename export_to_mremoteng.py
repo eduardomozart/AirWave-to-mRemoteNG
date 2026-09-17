@@ -203,7 +203,7 @@ def resolve_folder_id(folder_id, folders, flattened_folders):
     while current_folder_id in flattened_folders and current_folder_id not in visited:
         parent_id = folders[current_folder_id]['parent_id']
         if not parent_id or parent_id not in folders:
-            break
+            return None
 
         visited.add(current_folder_id)
         current_folder_id = parent_id
@@ -216,6 +216,7 @@ def build_tree(folders, devices, device_categories=None):
     Returns a list of root folder IDs.
     """
     root_folders = []
+    root_devices = []
     flattened_folders = get_flattened_folders(folders, device_categories)
 
     for fdata in folders.values():
@@ -245,6 +246,8 @@ def build_tree(folders, devices, device_categories=None):
         dev['effective_folder_id'] = fid
         if fid in folders:
             folders[fid]['devices'].append(dev)
+        elif fid is None:
+            root_devices.append(dev)
         else:
             # If a device has no valid folder, create a "Default Folder" or add it to root
             if "default" not in folders:
@@ -257,7 +260,7 @@ def build_tree(folders, devices, device_categories=None):
                 root_folders.append("default")
             folders["default"]['devices'].append(dev)
              
-    return root_folders
+    return root_folders, root_devices
 
 def collect_descendant_folder_ids(folder_ids, folders):
     """
@@ -280,7 +283,7 @@ def collect_descendant_folder_ids(folder_ids, folders):
 
     return scoped_folder_ids
 
-def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml", scoped_folder_ids=None):
+def create_mremoteng_xml(folders, root_folders, root_devices, out_path="mRemoteNG_AirWave.xml", scoped_folder_ids=None):
     """
     Generates mRemoteNG compatible XML file.
     """
@@ -348,6 +351,26 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         InheritRDGatewayDomain="false",
     )
 
+    def add_device(parent_el, dev):
+        dev_name = dev['name'] or dev['ip'] or "Unknown Device"
+        descr = dev['model'].strip()
+        if dev['serial_number']:
+            descr += f" (S/N: {dev['serial_number'].strip()})"
+        dev_attrs = dict(DEFAULT_PROPS)
+        dev_attrs.update(
+            Name=dev_name,
+            Type="Connection",
+            Id=str(uuid.uuid4()),
+            Descr=descr,
+            Icon="mRemoteNG",
+            Panel="General",
+            Hostname=dev['ip'] or "",
+            Protocol="SSH2",
+            Port="22",
+            PuttySession="Default Settings",
+        )
+        ET.SubElement(parent_el, "Node", **dev_attrs)
+
     def add_node(parent_el, folder_id):
         fdata = folders[folder_id]
         attrs = dict(DEFAULT_PROPS)
@@ -375,31 +398,19 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
             if scoped_folder_ids is not None and dev.get('effective_folder_id') not in scoped_folder_ids and dev['folder_id'] not in scoped_folder_ids:
                 continue
 
-            dev_name = dev['name'] or dev['ip'] or "Unknown Device"
-            descr = dev['model'].strip()
-            if dev['serial_number']:
-                descr += f" (S/N: {dev['serial_number'].strip()})"
-            dev_attrs = dict(DEFAULT_PROPS)
-            dev_attrs.update(
-                Name=dev_name,
-                Type="Connection",
-                Id=str(uuid.uuid4()),
-                Descr=descr,
-                Icon="mRemoteNG",
-                Panel="General",
-                Hostname=dev['ip'] or "",
-                Protocol="SSH2",
-                Port="22",
-                PuttySession="Default Settings",
-            )
-            ET.SubElement(container, "Node", **dev_attrs)
-                          
+            add_device(container, dev)
+                           
         # If the folder has no devices and no subfolders, remove it
         if len(container) == 0:
             parent_el.remove(container)
 
     for rf in sorted(root_folders, key=lambda x: folders[x]['name'].lower() if x in folders else x):
         add_node(root, rf)
+
+    for dev in sorted(root_devices, key=lambda x: (x['name'] or x['ip'] or "").lower()):
+        if scoped_folder_ids is not None and dev.get('effective_folder_id') not in scoped_folder_ids and dev['folder_id'] not in scoped_folder_ids:
+            continue
+        add_device(root, dev)
         
     tree = ET.ElementTree(root)
     ET.indent(tree, space="    ", level=0)
@@ -461,7 +472,7 @@ def main():
     
     print("Building folder hierarchy...")
     flattened_folders = get_flattened_folders(folders, device_categories)
-    root_folders = build_tree(folders, devices, device_categories=device_categories)
+    root_folders, root_devices = build_tree(folders, devices, device_categories=device_categories)
     
     airwave_folders = []
     if args.airwave_folder:
@@ -471,23 +482,33 @@ def main():
     if airwave_folders:
         matched_folder_ids = []
         filtered_roots = []
-        for fid, fdata in folders.items():
-            # Check if this folder's name matches any of the requested folders (case-insensitive)
-            for awf in airwave_folders:
+        for awf in airwave_folders:
+            matched_folder_id = None
+            for fid, fdata in folders.items():
                 if awf.lower() == fdata['name'].lower():
-                    matched_folder_ids.append(fid)
-                    filtered_roots.append(resolve_folder_id(fid, folders, flattened_folders))
+                    matched_folder_id = fid
                     break
-        if not filtered_roots:
+
+            if matched_folder_id:
+                matched_folder_ids.append(matched_folder_id)
+                resolved_root = resolve_folder_id(matched_folder_id, folders, flattened_folders)
+                if resolved_root is not None:
+                    filtered_roots.append(resolved_root)
+
+        if not matched_folder_ids:
             print("Warning: None of the specified AirWave folders were found.")
             return
         scoped_folder_ids = collect_descendant_folder_ids(matched_folder_ids, folders)
+        filtered_roots.extend([
+            root_id for root_id in root_folders
+            if root_id in scoped_folder_ids
+        ])
         root_folders = list(dict.fromkeys(filtered_roots))
     else:
         scoped_folder_ids = None
     
     out_file = args.output
-    create_mremoteng_xml(folders, root_folders, out_file, scoped_folder_ids=scoped_folder_ids)
+    create_mremoteng_xml(folders, root_folders, root_devices, out_file, scoped_folder_ids=scoped_folder_ids)
     print("Process complete.")
 
 if __name__ == "__main__":
