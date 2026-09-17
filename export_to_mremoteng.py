@@ -9,6 +9,7 @@ import uuid
 urllib3.disable_warnings()
 
 VERSION = "DEV_BUILD"
+FLATTENED_FOLDER_KEYWORDS = ("switch", "access point")
 
 def parse_args():
     """
@@ -119,16 +120,47 @@ def parse_devices(xml_data, device_categories=None, models=None):
         devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
     return devices, total_devices
 
-def build_tree(folders, devices):
+def should_flatten_folder(folder_name):
+    """
+    Returns True when the folder should be flattened into its parent.
+    """
+    folder_name = (folder_name or "").lower()
+    return any(keyword in folder_name for keyword in FLATTENED_FOLDER_KEYWORDS)
+
+def build_tree(folders, devices, flatten_category_folders=False):
     """
     Links subfolders to their parents and assigns devices to folders.
     Returns a list of root folder IDs.
     """
     root_folders = []
+    flattened_folders = set()
+
+    for fdata in folders.values():
+        fdata['subfolders'] = []
+        fdata['devices'] = []
+
+    if flatten_category_folders:
+        for fid, fdata in folders.items():
+            pid = fdata['parent_id']
+            if pid and pid in folders and should_flatten_folder(fdata['name']):
+                flattened_folders.add(fid)
+
+    def resolve_target_folder(folder_id):
+        current_folder_id = folder_id
+        visited = set()
+
+        while current_folder_id in flattened_folders and current_folder_id not in visited:
+            visited.add(current_folder_id)
+            current_folder_id = folders[current_folder_id]['parent_id']
+
+        return current_folder_id
     
     # Link subfolders
     for fid, fdata in folders.items():
-        pid = fdata['parent_id']
+        if fid in flattened_folders:
+            continue
+
+        pid = resolve_target_folder(fdata['parent_id'])
         # If parent exists and is not the current folder itself
         if pid and pid in folders and pid != fid:
             folders[pid]['subfolders'].append(fid)
@@ -137,7 +169,7 @@ def build_tree(folders, devices):
             
     # Assign devices
     for dev in devices:
-        fid = dev['folder_id']
+        fid = resolve_target_folder(dev['folder_id'])
         if fid in folders:
             folders[fid]['devices'].append(dev)
         else:
@@ -330,7 +362,7 @@ def main():
     print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
     
     print("Building folder hierarchy...")
-    root_folders = build_tree(folders, devices)
+    root_folders = build_tree(folders, devices, flatten_category_folders=bool(device_categories))
     
     airwave_folders = []
     if args.airwave_folder:
