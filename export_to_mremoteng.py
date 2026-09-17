@@ -17,8 +17,8 @@ def parse_args():
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
     parser.add_argument('-m', '--master-folder', help="Wrap all exported nodes in a master folder with this name (e.g., 'AirWave Sync')")
-    parser.add_argument('-d', '--dry-run', action='store_true', help="Only test the AirWave connection and print raw XML fields (does not create an XML file)")
-    
+    parser.add_argument('-t', '--dry-run', action='store_true', help="Only test the AirWave connection and print raw XML fields (does not create an XML file)")
+    parser.add_argument('-d', '--device-category', help="Filter devices by category separated by comma (e.g. 'switch,ap')")
     try:
         args = parser.parse_args()
     except SystemExit:
@@ -52,7 +52,7 @@ def parse_folders(xml_data):
             }
     return folders
 
-def parse_devices(xml_data):
+def parse_devices(xml_data, device_categories=None):
     """
     Parses ap_detail.xml to extract devices (APs).
     Returns a list of dicts: [{'name': ..., 'ip': ..., 'folder_id': ...}, ...]
@@ -76,21 +76,22 @@ def parse_devices(xml_data):
         if folder_el is not None:
             folder_id = folder_el.get('id')
                 
-        # We need to filter for switches. We will check the XML tags to ensure we only grab switches.
-        # This tag might be <device_category>, <type>, or <model>. We'll finalize this once we test.
         device_category = ap_el.findtext('device_category')
         model = ap_el.findtext('model')
         
-        # Placeholder condition: checking if "switch" is in device_category or model
-        # We will adjust this exact condition based on your test output.
-        is_switch = False
-        if device_category and 'switch' in device_category.lower():
-            is_switch = True
-        if model and 'switch' in model.lower():
-            is_switch = True
-            
-        if not is_switch:
-            continue
+        # If device_categories is provided, filter by it. Otherwise, include all.
+        if device_categories:
+            is_match = False
+            for cat in device_categories:
+                cat_lower = cat.strip().lower()
+                if device_category and cat_lower in device_category.lower():
+                    is_match = True
+                    break
+                if model and cat_lower in model.lower():
+                    is_match = True
+                    break
+            if not is_match:
+                continue
             
         devices.append({'name': name, 'ip': ip, 'folder_id': folder_id})
     return devices
@@ -226,7 +227,11 @@ def main():
         print("Error: Received empty response for AP list.")
         return
         
-    devices = parse_devices(ap_xml)
+    device_categories = None
+    if args.device_category:
+        device_categories = args.device_category.split(',')
+
+    devices = parse_devices(ap_xml, device_categories)
     print(f"Parsed {len(devices)} devices.")
     
     print("Building folder hierarchy...")

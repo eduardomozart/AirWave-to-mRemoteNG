@@ -28,7 +28,8 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 | `--password` | `-p` | **Yes** | Your AirWave API Administrator password. |
 | `--output` | `-o` | No | Custom filename for the output XML. (Default: `mRemoteNG_AirWave.xml`) |
 | `--master-folder` | `-m` | No | Wraps all exported items in a root folder with this name (e.g., `"AirWave Sync"`). Highly recommended to make updating and deleting duplicates in mRemoteNG easier. |
-| `--dry-run` | `-d` | No | Test mode: Only connects to AirWave and prints the raw XML output. It will *not* generate the mRemoteNG file. |
+| `--device-category` | `-d` | No | Filter devices by category separated by comma (e.g. `switch,ap`). Exports everything by default. |
+| `--dry-run` | `-t` | No | Test mode: Only connects to AirWave and prints the raw XML output. It will *not* generate the mRemoteNG file. |
 
 ### Example
 ```powershell
