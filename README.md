@@ -2,7 +2,7 @@
 A Python tool that extracts network device hierarchies (switches/APs) from the Aruba AirWave API and exports them into an mRemoteNG-compatible XML configuration.
 
 ## Binary Releases
-Download the latest pre-compiled version from the **[Releases tab](../../releases)**.
+Download the latest pre-compiled version from the **[Releases](../../releases)** page.
 
 ## Requirements
 If you are running the script from source, this script relies on the [pyairwave](https://github.com/AIOpsTiger/pyairwave) module for API interactions.
