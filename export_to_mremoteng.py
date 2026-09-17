@@ -107,7 +107,7 @@ def parse_devices(xml_data, device_categories=None, models=None):
             if not is_match:
                 continue
             
-        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id})
+        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model or ""})
     return devices
 
 def build_tree(folders, devices):
@@ -152,7 +152,11 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
     ET.register_namespace('mrng', 'http://mremoteng.org')
     root = ET.Element("{http://mremoteng.org}Connections", 
                       Name="Connections", 
-                      Export="false", 
+                      Export="false",
+                      EncryptionEngine="AES",
+                      BlockCipherMode="GCM",
+                      KdfIterations="1000",
+                      FullFileEncryption="false",
                       ConfVersion="2.6")
     
     # If a mremoteng folder name is provided, wrap everything inside it. Otherwise, attach directly to root.
@@ -162,7 +166,10 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                                       Name=mremoteng_folder_name, 
                                       Type="Container", 
                                       Id=str(uuid.uuid4()),
-                                      Expanded="true")
+                                      Descr="",
+                                      Icon="mRemoteNG",
+                                      Panel="General",
+                                      Expanded="false")
     
     def add_node(parent_el, folder_id):
         fdata = folders[folder_id]
@@ -170,7 +177,10 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                                   Name=fdata['name'], 
                                   Type="Container", 
                                   Id=str(uuid.uuid4()),
-                                  Expanded="true")
+                                  Descr="",
+                                  Icon="mRemoteNG",
+                                  Panel="General",
+                                  Expanded="false")
         
         # Add subfolders recursively
         for sub_id in fdata['subfolders']:
@@ -184,6 +194,9 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                           Name=dev_name, 
                           Type="Connection", 
                           Id=str(uuid.uuid4()),
+                          Descr=dev['model'],
+                          Icon="mRemoteNG",
+                          Panel="General",
                           Hostname=dev['ip'] or "", 
                           Protocol="SSH2", 
                           Port="22",
