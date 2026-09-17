@@ -23,7 +23,6 @@ def parse_args():
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
-    parser.add_argument('-n', '--mremoteng-folder', help="Wrap all exported nodes in a master folder with this name (e.g., 'AirWave Sync')")
     parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times or comma-separated.")
     parser.add_argument('-t', '--dry-run', action='store_true', help="Only test the AirWave connection and print raw XML fields (does not create an XML file)")
     parser.add_argument('-d', '--device-category', action='append', help="Filter devices by category. Can be specified multiple times or comma-separated.")
@@ -51,6 +50,9 @@ def parse_folders(xml_data):
     for folder_el in root.iter('folder'):
         fid = folder_el.get('id')
         name = folder_el.findtext('name')
+        if name and name.strip().lower() == "top":
+            continue
+            
         parent_id = folder_el.findtext('parent_id')
         if fid:
             folders[fid] = {
@@ -75,7 +77,9 @@ def parse_devices(xml_data, device_categories=None, models=None):
     devices = []
     for ap_el in root.iter('ap'):
         name = ap_el.findtext('name')
-        
+        if name and name.strip().startswith("(id:"):
+            continue
+            
         # IP could be in <lan_ip>, <ip>, or <remote_lan_ip>
         ip = ap_el.findtext('lan_ip') or ap_el.findtext('ip') or ap_el.findtext('remote_lan_ip') or ""
         
@@ -85,8 +89,8 @@ def parse_devices(xml_data, device_categories=None, models=None):
         if folder_el is not None:
             folder_id = folder_el.get('id')
                 
-        device_category = ap_el.findtext('device_category')
-        model = ap_el.findtext('model')
+        device_category = ap_el.findtext('device_category') or ""
+        model = ap_el.findtext('model') or ""
         
         # If filters are provided, check if either matches. Otherwise include all.
         if device_categories or models:
@@ -107,7 +111,7 @@ def parse_devices(xml_data, device_categories=None, models=None):
             if not is_match:
                 continue
             
-        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model or ""})
+        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model})
     return devices
 
 def build_tree(folders, devices):
@@ -145,7 +149,7 @@ def build_tree(folders, devices):
             
     return root_folders
 
-def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml", mremoteng_folder_name=None):
+def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"):
     """
     Generates mRemoteNG compatible XML file.
     """
@@ -159,18 +163,6 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                       FullFileEncryption="false",
                       Protected="zjEfDtvs6NSdcjGiMNojrC9xfCJPE1VXBPJbqqAMBxKn+yKU4FCwZkvhnUSG/wb5+N10GTtNpU2XaZ8rIul+8gQK",
                       ConfVersion="2.6")
-    
-    # If a mremoteng folder name is provided, wrap everything inside it. Otherwise, attach directly to root.
-    target_parent = root
-    if mremoteng_folder_name:
-        target_parent = ET.SubElement(root, "Node", 
-                                      Name=mremoteng_folder_name, 
-                                      Type="Container", 
-                                      Id=str(uuid.uuid4()),
-                                      Descr="",
-                                      Icon="mRemoteNG",
-                                      Panel="General",
-                                      Expanded="false")
     
     def add_node(parent_el, folder_id):
         fdata = folders[folder_id]
@@ -209,7 +201,7 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
                           UserField="")
 
     for rf in root_folders:
-        add_node(target_parent, rf)
+        add_node(root, rf)
         
     tree = ET.ElementTree(root)
     ET.indent(tree, space="    ", level=0)
