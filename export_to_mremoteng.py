@@ -129,7 +129,7 @@ def flatten_folders_by_category(folders, devices, device_categories):
 
     folders_to_remove = set()
     
-    # Identify folders whose names exactly match the passed-in device categories
+    # Identify folders whose names exactly match the passed-in device categories (case-insensitive)
     for fid, fdata in folders.items():
         name_lower = fdata['name'].strip().lower()
         for cat in device_categories:
@@ -141,6 +141,7 @@ def flatten_folders_by_category(folders, devices, device_categories):
         return
 
     def get_kept_parent(fid):
+        # Climbs the folder tree until it finds an ancestor that isn't flagged for removal
         curr = fid
         while curr in folders_to_remove:
             p = folders[curr].get('parent_id')
@@ -149,12 +150,12 @@ def flatten_folders_by_category(folders, devices, device_categories):
             curr = p
         return curr
 
-    # Reassign devices to the nearest kept parent
+    # Reassign devices from the removed folder to its surviving parent
     for dev in devices:
         if dev['folder_id'] in folders_to_remove:
             dev['folder_id'] = get_kept_parent(dev['folder_id'])
 
-    # Reassign child folders to the nearest kept parent
+    # Reassign orphan subfolders to the surviving parent
     for fid, fdata in list(folders.items()):
         if fid not in folders_to_remove and fdata['parent_id'] in folders_to_remove:
             fdata['parent_id'] = get_kept_parent(fdata['parent_id'])
