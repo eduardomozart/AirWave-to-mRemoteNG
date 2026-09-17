@@ -5,11 +5,16 @@ import os
 import argparse
 import sys
 import uuid
+import re
 
 urllib3.disable_warnings()
 
 VERSION = "DEV_BUILD"
-FLATTENED_FOLDER_KEYWORDS = ("switch", "access point")
+FLATTENED_FOLDER_LABELS = (
+    {"switch", "switches"},
+    {"access", "point", "points"},
+)
+FLATTENED_FOLDER_GENERIC_WORDS = {"device", "devices"}
 
 def parse_args():
     """
@@ -124,8 +129,15 @@ def should_flatten_folder(folder_name):
     """
     Returns True when the folder should be flattened into its parent.
     """
-    folder_name = (folder_name or "").lower()
-    return any(keyword in folder_name for keyword in FLATTENED_FOLDER_KEYWORDS)
+    folder_tokens = set(re.findall(r"[a-z0-9]+", (folder_name or "").lower()))
+    if not folder_tokens:
+        return False
+
+    for label_tokens in FLATTENED_FOLDER_LABELS:
+        if label_tokens & folder_tokens and folder_tokens <= (label_tokens | FLATTENED_FOLDER_GENERIC_WORDS):
+            return True
+
+    return False
 
 def get_flattened_folders(folders, flatten_category_folders=False):
     """
