@@ -1,5 +1,5 @@
 # AirWave-to-mRemoteNG
-A Python tool that extracts network device hierarchies (switches/APs) from the Aruba AirWave API and exports them into an mRemoteNG-compatible XML configuration.
+A Python tool that extracts network device hierarchies from the Aruba AirWave API and exports them into an mRemoteNG-compatible XML configuration.
 
 ## Binary Releases
 Download the latest pre-compiled version from the **[Releases](../../releases)** page.
@@ -28,7 +28,7 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 | `--password` | `-p` | **Yes** | Your AirWave API Administrator password. |
 | `--output` | `-o` | No | Custom filename for the output XML. (Default: `mRemoteNG_AirWave.xml`) |
 | `--airwave-folder` | `-f` | No | Filter by AirWave folder name (recursive). Can be passed multiple times. Exports all folders by default. |
-| `--device-category` | `-c` | No | Filter by `<device_category>` (e.g. `switch, thin_ap, controller`). Can be passed multiple times (e.g. `-c switch -c thin_ap`). Exports everything by default. |
+| `--device-category` | `-c` | No | Filter by `<device_category>` (e.g. `switch`, `thin_ap`, `controller`). Can be passed multiple times (e.g. `-c switch -c thin_ap`). Exports everything by default. |
 | `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times. |
 | `--debug` | `-d` | No | Debug mode: Prints the raw XML output from AirWave to the console during execution. |
 | `--version` | `-v` | No | Show program's version number and exit. |
