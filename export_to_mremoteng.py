@@ -127,40 +127,58 @@ def should_flatten_folder(folder_name):
     folder_name = (folder_name or "").lower()
     return any(keyword in folder_name for keyword in FLATTENED_FOLDER_KEYWORDS)
 
+def get_flattened_folders(folders, flatten_category_folders=False):
+    """
+    Returns the set of folder IDs that are candidates for flattening.
+    """
+    if not flatten_category_folders:
+        return set()
+
+    return {
+        fid for fid, fdata in folders.items()
+        if should_flatten_folder(fdata['name'])
+    }
+
+def resolve_folder_id(folder_id, folders, flattened_folders):
+    """
+    Resolves a folder ID to the nearest visible parent folder.
+    """
+    current_folder_id = folder_id
+    visited = set()
+
+    while current_folder_id in flattened_folders and current_folder_id not in visited:
+        parent_id = folders[current_folder_id]['parent_id']
+        if not parent_id or parent_id not in folders:
+            break
+
+        visited.add(current_folder_id)
+        current_folder_id = parent_id
+
+    return current_folder_id
+
 def build_tree(folders, devices, flatten_category_folders=False):
     """
     Links subfolders to their parents and assigns devices to folders.
     Returns a list of root folder IDs.
     """
     root_folders = []
-    flattened_folders = set()
+    flattened_folders = get_flattened_folders(folders, flatten_category_folders)
 
     for fdata in folders.values():
         fdata['subfolders'] = []
         fdata['devices'] = []
 
-    if flatten_category_folders:
-        for fid, fdata in folders.items():
-            pid = fdata['parent_id']
-            if pid and pid in folders and should_flatten_folder(fdata['name']):
-                flattened_folders.add(fid)
-
-    def resolve_target_folder(folder_id):
-        current_folder_id = folder_id
-        visited = set()
-
-        while current_folder_id in flattened_folders and current_folder_id not in visited:
-            visited.add(current_folder_id)
-            current_folder_id = folders[current_folder_id]['parent_id']
-
-        return current_folder_id
+    hidden_folders = {
+        fid for fid in flattened_folders
+        if resolve_folder_id(fid, folders, flattened_folders) != fid
+    }
     
     # Link subfolders
     for fid, fdata in folders.items():
-        if fid in flattened_folders:
+        if fid in hidden_folders:
             continue
 
-        pid = resolve_target_folder(fdata['parent_id'])
+        pid = resolve_folder_id(fdata['parent_id'], folders, flattened_folders)
         # If parent exists and is not the current folder itself
         if pid and pid in folders and pid != fid:
             folders[pid]['subfolders'].append(fid)
@@ -169,7 +187,7 @@ def build_tree(folders, devices, flatten_category_folders=False):
             
     # Assign devices
     for dev in devices:
-        fid = resolve_target_folder(dev['folder_id'])
+        fid = resolve_folder_id(dev['folder_id'], folders, flattened_folders)
         if fid in folders:
             folders[fid]['devices'].append(dev)
         else:
@@ -362,7 +380,9 @@ def main():
     print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
     
     print("Building folder hierarchy...")
-    root_folders = build_tree(folders, devices, flatten_category_folders=bool(device_categories))
+    flatten_category_folders = bool(device_categories)
+    flattened_folders = get_flattened_folders(folders, flatten_category_folders)
+    root_folders = build_tree(folders, devices, flatten_category_folders=flatten_category_folders)
     
     airwave_folders = []
     if args.airwave_folder:
@@ -375,12 +395,12 @@ def main():
             # Check if this folder's name matches any of the requested folders (case-insensitive)
             for awf in airwave_folders:
                 if awf.lower() == fdata['name'].lower():
-                    filtered_roots.append(fid)
+                    filtered_roots.append(resolve_folder_id(fid, folders, flattened_folders))
                     break
         if not filtered_roots:
             print("Warning: None of the specified AirWave folders were found.")
             return
-        root_folders = filtered_roots
+        root_folders = list(dict.fromkeys(filtered_roots))
     
     out_file = args.output
     create_mremoteng_xml(folders, root_folders, out_file)
