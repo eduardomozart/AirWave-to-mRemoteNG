@@ -241,8 +241,8 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         for sub_id in sorted(fdata['subfolders'], key=lambda x: folders[x]['name'].lower()):
             add_node(container, sub_id)
             
-        # Add devices
-        for dev in fdata['devices']:
+        # Add devices (alphabetically sorted)
+        for dev in sorted(fdata['devices'], key=lambda x: (x['name'] or x['ip'] or "").lower()):
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
             descr = dev['model'].strip()
             if dev['serial_number']:
