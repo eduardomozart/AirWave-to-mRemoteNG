@@ -27,9 +27,9 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 | `--username` | `-u` | **Yes** | Your AirWave API Administrator username. |
 | `--password` | `-p` | **Yes** | Your AirWave API Administrator password. |
 | `--output` | `-o` | No | Custom filename for the output XML. (Default: `mRemoteNG_AirWave.xml`) |
-| `--airwave-folder` | `-f` | No | Filter by AirWave folder name (recursive). Can be passed multiple times or comma-separated. Exports all folders by default. |
-| `--device-category` | `-d` | No | Filter by `<device_category>` (e.g. `switch,thin_ap`). Can be passed multiple times (e.g. `-d switch -d thin_ap`) or comma-separated. Exports everything by default. |
-| `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times or comma-separated. |
+| `--airwave-folder` | `-f` | No | Filter by AirWave folder name (recursive). Can be passed multiple times. Exports all folders by default. |
+| `--device-category` | `-d` | No | Filter by `<device_category>` (e.g. `switch`, `thin_ap`, `controller`). Can be passed multiple times (e.g. `-d switch -d thin_ap`). Exports everything by default. |
+| `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times. |
 | `--dry-run` | `-t` | No | Test mode: Only connects to AirWave and prints the raw XML output. It will *not* generate the mRemoteNG file. |
 | `--version` | `-v` | No | Show program's version number and exit. |
 

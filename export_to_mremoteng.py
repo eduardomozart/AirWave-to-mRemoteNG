@@ -23,10 +23,10 @@ def parse_args():
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
-    parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times or comma-separated.")
+    parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times.")
     parser.add_argument('-t', '--dry-run', action='store_true', help="Only test the AirWave connection and print raw XML fields (does not create an XML file)")
-    parser.add_argument('-d', '--device-category', action='append', help="Filter devices by category. Can be specified multiple times or comma-separated.")
-    parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times or comma-separated.")
+    parser.add_argument('-d', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
+    parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times.")
     try:
         args = parser.parse_args()
     except SystemExit:
@@ -272,12 +272,12 @@ def main():
     device_categories = []
     if args.device_category:
         for item in args.device_category:
-            device_categories.extend([cat.strip() for cat in item.split(',') if cat.strip()])
+            device_categories.append(item.strip())
 
     models = []
     if args.model:
         for item in args.model:
-            models.extend([m.strip() for m in item.split(',') if m.strip()])
+            models.append(item.strip())
 
     devices = parse_devices(ap_xml, device_categories if device_categories else None, models if models else None)
     print(f"Parsed {len(devices)} devices.")
@@ -288,7 +288,7 @@ def main():
     airwave_folders = []
     if args.airwave_folder:
         for item in args.airwave_folder:
-            airwave_folders.extend([f.strip() for f in item.split(',') if f.strip()])
+            airwave_folders.append(item.strip())
             
     if airwave_folders:
         filtered_roots = []
