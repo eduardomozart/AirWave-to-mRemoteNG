@@ -4,6 +4,7 @@ import urllib3
 import os
 import argparse
 import sys
+import uuid
 
 urllib3.disable_warnings()
 
@@ -148,7 +149,11 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
     """
     Generates mRemoteNG compatible XML file.
     """
-    root = ET.Element("Connections", Name="Connections", Export="False", ConfVersion="2.6")
+    ET.register_namespace('mrng', 'http://mremoteng.org')
+    root = ET.Element("{http://mremoteng.org}Connections", 
+                      Name="Connections", 
+                      Export="false", 
+                      ConfVersion="2.6")
     
     # If a mremoteng folder name is provided, wrap everything inside it. Otherwise, attach directly to root.
     target_parent = root
@@ -156,14 +161,16 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         target_parent = ET.SubElement(root, "Node", 
                                       Name=mremoteng_folder_name, 
                                       Type="Container", 
-                                      Expanded="True")
+                                      Id=str(uuid.uuid4()),
+                                      Expanded="true")
     
     def add_node(parent_el, folder_id):
         fdata = folders[folder_id]
         container = ET.SubElement(parent_el, "Node", 
                                   Name=fdata['name'], 
                                   Type="Container", 
-                                  Expanded="True")
+                                  Id=str(uuid.uuid4()),
+                                  Expanded="true")
         
         # Add subfolders recursively
         for sub_id in fdata['subfolders']:
@@ -176,6 +183,7 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
             ET.SubElement(container, "Node", 
                           Name=dev_name, 
                           Type="Connection", 
+                          Id=str(uuid.uuid4()),
                           Hostname=dev['ip'] or "", 
                           Protocol="SSH2", 
                           Port="22",
