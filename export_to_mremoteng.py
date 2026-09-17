@@ -84,6 +84,8 @@ def parse_devices(xml_data, device_categories=None, models=None):
             
         # IP could be in <lan_ip>, <ip>, or <remote_lan_ip>
         ip = ap_el.findtext('lan_ip') or ap_el.findtext('ip') or ap_el.findtext('remote_lan_ip') or ""
+        if not ip:
+            continue
         
         # folder ID is typically an attribute in <folder id="...">
         folder_id = None
