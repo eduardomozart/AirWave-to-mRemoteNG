@@ -23,6 +23,7 @@ def parse_args():
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
     parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times.")
+    parser.add_argument('-l', '--flatten-folder', action='append', help="Flatten specific folder names (e.g. 'Switch', 'Access Point') by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be specified multiple times.")
     parser.add_argument('-c', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
     parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times.")
     parser.add_argument('-d', '--debug', action='store_true', help="Print raw XML payloads from AirWave API to the console before generating the mRemoteNG file.")
@@ -119,27 +120,23 @@ def parse_devices(xml_data, device_categories=None, models=None):
         devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
     return devices, total_devices
 
-def flatten_folders_by_category(folders, devices, device_categories):
+def flatten_folders_by_name(folders, devices, flatten_folders):
     """
-    Removes folders that start with the provided device categories, EXCEPT 
-    when a parent folder contains multiple categories (e.g. both 'Switch' and 'Access Point').
+    Removes folders whose names contain any of the provided strings in flatten_folders
+    from the mRemoteNG hierarchy, EXCEPT when a parent folder contains multiple such 
+    folders (e.g. both 'Switch' and 'Access Point').
     Reassigns flattened devices and subfolders to the nearest kept parent folder.
     """
-    categories_to_flatten = []
-    if device_categories:
-        categories_to_flatten.extend(device_categories)
-    
-    # Always include 'Access Point' in the flatten categories
-    if not any(c.lower() == 'access point' for c in categories_to_flatten):
-        categories_to_flatten.append('Access Point')
-        
+    if not flatten_folders:
+        return
+
     candidate_folders = set()
     
-    # Identify all folders whose names contain the passed-in device categories (case-insensitive)
+    # Identify all folders whose names contain the passed-in strings (case-insensitive)
     for fid, fdata in folders.items():
         name_lower = fdata['name'].strip().lower()
-        for cat in categories_to_flatten:
-            if cat.lower() in name_lower:
+        for folder_name in flatten_folders:
+            if folder_name.lower() in name_lower:
                 candidate_folders.add(fid)
                 break
                 
@@ -389,34 +386,20 @@ def main():
         print("\n--- [DEBUG] ap_list.xml ---")
         print(ap_xml)
         
-    device_categories = []
-    if args.device_category:
-        for item in args.device_category:
-            device_categories.append(item.strip())
-
-    models = []
-    if args.model:
-        for item in args.model:
-            models.append(item.strip())
-
-    devices, total_devices = parse_devices(ap_xml, device_categories if device_categories else None, models if models else None)
+    devices, total_devices = parse_devices(ap_xml, args.device_category, args.model)
     print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
     
-    flatten_folders_by_category(folders, devices, device_categories)
+    if args.flatten_folder:
+        flatten_folders_by_name(folders, devices, args.flatten_folder)
     
     print("Building folder hierarchy...")
     root_folders = build_tree(folders, devices)
     
-    airwave_folders = []
     if args.airwave_folder:
-        for item in args.airwave_folder:
-            airwave_folders.append(item.strip())
-            
-    if airwave_folders:
         filtered_roots = []
         for fid, fdata in folders.items():
             # Check if this folder's name matches any of the requested folders (case-insensitive)
-            for awf in airwave_folders:
+            for awf in args.airwave_folder:
                 if awf.lower() == fdata['name'].lower():
                     filtered_roots.append(fid)
                     break
