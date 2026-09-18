@@ -94,7 +94,7 @@ def parse_devices(xml_data, device_categories=None, models=None):
             folder_id = folder_el.get('id')
                 
         device_category = ap_el.findtext('device_category') or ""
-        model = ap_el.findtext('model') or ""
+        model = (ap_el.findtext('model') or "").strip()
         
         # If filters are provided, check if either matches. Otherwise include all.
         if device_categories or models:
@@ -121,20 +121,25 @@ def parse_devices(xml_data, device_categories=None, models=None):
 
 def flatten_folders_by_category(folders, devices, device_categories):
     """
-    Removes folders that exactly match the provided device categories, EXCEPT 
+    Removes folders that start with the provided device categories, EXCEPT 
     when a parent folder contains multiple categories (e.g. both 'Switch' and 'Access Point').
     Reassigns flattened devices and subfolders to the nearest kept parent folder.
     """
-    if not device_categories:
-        return
-
+    categories_to_flatten = []
+    if device_categories:
+        categories_to_flatten.extend(device_categories)
+    
+    # Always include 'Access Point' in the flatten categories
+    if not any(c.lower() == 'access point' for c in categories_to_flatten):
+        categories_to_flatten.append('Access Point')
+        
     candidate_folders = set()
     
-    # Identify all folders whose names exactly match the passed-in device categories (case-insensitive)
+    # Identify all folders whose names contain the passed-in device categories (case-insensitive)
     for fid, fdata in folders.items():
         name_lower = fdata['name'].strip().lower()
-        for cat in device_categories:
-            if cat.lower() == name_lower:
+        for cat in categories_to_flatten:
+            if cat.lower() in name_lower:
                 candidate_folders.add(fid)
                 break
                 
@@ -311,9 +316,12 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         # Add devices (alphabetically sorted)
         for dev in sorted(fdata['devices'], key=lambda x: (x['name'] or x['ip'] or "").lower()):
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
+            # Note: mRemoteNG stable (v1.76.20) fails to import entries where properties
+            # like 'Descr' start with a space. This bug is fixed in the current Nightly, 
+            # but we strip() the string here to ensure compatibility with stable releases.
             descr = dev['model'].strip()
             if dev['serial_number']:
-                descr += f" (S/N: {dev['serial_number'].strip()})"
+                descr += f" (S/N: {dev['serial_number']})"
             dev_attrs = dict(DEFAULT_PROPS)
             dev_attrs.update(
                 Name=dev_name,
