@@ -5,11 +5,14 @@ A Python tool that extracts network device hierarchies from the Aruba AirWave AP
 Download the latest pre-compiled version from the **[Releases](../../releases)** page.
 
 ## Requirements
-If you are running the script from source, this script relies on the [pyairwave](https://github.com/AIOpsTiger/pyairwave) module for API interactions.
-
-You can install it directly via `pip` from its GitHub repository:
+If you are running the script from source, install dependencies from `requirements.txt`:
 ```bash
-pip install git+https://github.com/AIOpsTiger/pyairwave.git
+pip install -r requirements.txt
+```
+
+Alternatively, you can install the required [`airwaveapiclient`](https://github.com/eduardomozart/airwaveapiclient) library directly:
+```bash
+pip install git+https://github.com/eduardomozart/airwaveapiclient.git
 ```
 
 ## Usage
@@ -23,11 +26,11 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 
 | Argument | Short | Required | Description |
 | :--- | :---: | :---: | :--- |
-| `--ip` | `-i` | **Yes** | The IP address or Hostname of your Aruba AirWave server. |
+| `--ip` | `-i` | **Yes** | The IP address, Hostname, or URL (e.g. `10.0.0.5` or `https://10.0.0.5`) of your Aruba AirWave server. |
 | `--username` | `-u` | **Yes** | Your AirWave API Administrator username. |
 | `--password` | `-p` | **Yes** | Your AirWave API Administrator password. |
 | `--output` | `-o` | No | Custom filename for the output XML. (Default: `mRemoteNG_AirWave.xml`) |
-| `--airwave-folder` | `-f` | No | Filter by AirWave folder name (recursive). Can be passed multiple times. Exports all folders by default. |
+| `--airwave-folder` | `-f` | No | Filter by AirWave folder name or hierarchical breadcrumb path (e.g. `Campus A` or `Top > Campus B > Building 1`). Can be passed multiple times. Exports all folders by default. |
 | `--flatten-folder` | `-l` | No | Flatten specific folder names (e.g. `Switch`, `Access Point`) by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be passed multiple times. |
 | `--device-category` | `-c` | No | Filter by `<device_category>` (e.g. `switch, thin_ap, controller`). Can be passed multiple times (e.g. `-c switch -c thin_ap`). Exports everything by default. |
 | `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times. |
@@ -44,6 +47,13 @@ Because mRemoteNG relies on unique GUIDs and **does not merge or update** existi
 1. Run this script.
 2. In mRemoteNG, right-click and **delete** the old imported folder.
 3. Go to **File -> Import -> Import from File** and select your newly generated XML to bring in the fresh hierarchy. mRemoteNG will automatically create a subfolder for the imported items.
+
+## Running Tests
+To run the automated test suite, install the development dependencies and run pytest:
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ## How to Create a Windows Binary
 

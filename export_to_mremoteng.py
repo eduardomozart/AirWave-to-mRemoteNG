@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from pyairwave.awapi import ArubaAirwave
+from airwaveapiclient import AirWaveAPIClient, APList, FolderList
 import urllib3
 import os
 import argparse
@@ -30,7 +30,9 @@ def parse_args():
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     try:
         args = parser.parse_args()
-    except SystemExit:
+    except SystemExit as e:
+        if e.code == 0:
+            raise
         print("\nError: Missing required arguments. Please provide --ip, --username, and --password.")
         sys.exit(1)
         
@@ -38,86 +40,120 @@ def parse_args():
 
 def parse_folders(xml_data):
     """
-    Parses folder_list.xml to extract folders and build a hierarchy.
-    Returns a dict: {folder_id: {'name': folder_name, 'parent_id': parent_id, 'subfolders': [], 'devices': []}}
+    Parses folder_list.xml to extract folders and build a hierarchy using FolderList.
+    Returns:
+        tuple: (folders, fl)
+            folders (dict): {folder_id: {'name': folder_name, 'parent_id': parent_id, 'subfolders': [], 'devices': [], 'folder_path': folder_path}}
+            fl (FolderList or None): FolderList object
     """
     try:
-        root = ET.fromstring(xml_data)
-    except ET.ParseError as e:
+        fl = xml_data if isinstance(xml_data, FolderList) else FolderList(xml_data)
+    except Exception as e:
         print(f"Error parsing folder list XML: {e}")
-        return {}
+        return {}, None
 
     folders = {}
-    for folder_el in root.iter('folder'):
-        fid = folder_el.get('id')
-        name = folder_el.findtext('name')
-        if name and name.strip().lower() == "top":
-            continue
-            
-        parent_id = folder_el.findtext('parent_id')
+    all_names = {}
+    all_parents = {}
+    for node in fl:
+        fid = str(node.get('@id') or node.get('id') or '').strip()
+        fname = str(node.get('name') or '').strip()
         if fid:
-            folders[fid] = {
-                'name': name or "Unknown Folder", 
-                'parent_id': parent_id, 
-                'subfolders': [], 
-                'devices': []
-            }
-    return folders
+            all_names[fid] = fname
+            pid = str(node.get('parent_id') or node.get('parent') or '').strip()
+            all_parents[fid] = pid if pid and pid != '0' else None
+
+    for fid, name in all_names.items():
+        if name and name.lower() == "top":
+            continue
+        folders[fid] = {
+            'name': name or "Unknown Folder", 
+            'parent_id': all_parents.get(fid), 
+            'subfolders': [], 
+            'devices': []
+        }
+
+    # Precompute folder_path breadcrumbs for each folder
+    for fid, fdata in folders.items():
+        path_names = [fdata['name']]
+        curr = fdata['parent_id']
+        visited = {fid}
+        while curr and curr not in visited:
+            visited.add(curr)
+            if curr in all_names:
+                path_names.append(all_names[curr])
+            curr = all_parents.get(curr)
+        path_names.reverse()
+        fdata['folder_path'] = " > ".join(path_names)
+
+    return folders, fl
 
 def parse_devices(xml_data, device_categories=None, models=None):
     """
-    Parses ap_detail.xml to extract devices (APs).
+    Parses ap_list.xml to extract devices (APs) using APList.
     Returns a list of dicts: [{'name': ..., 'ip': ..., 'folder_id': ...}, ...]
     """
     try:
-        root = ET.fromstring(xml_data)
-    except ET.ParseError as e:
-        print(f"Error parsing AP detail XML: {e}")
-        return []
+        ap_list = xml_data if isinstance(xml_data, APList) else APList(xml_data)
+    except Exception as e:
+        print(f"Error parsing AP list XML: {e}")
+        return [], 0
 
     devices = []
-    total_devices = 0
-    for ap_el in root.iter('ap'):
-        total_devices += 1
-        name = ap_el.findtext('name')
-        if name and name.strip().startswith("(id:"):
+    total_devices = len(ap_list)
+    for ap in ap_list:
+        name = ap.get('name')
+        if not name or str(name).strip().startswith("(id:"):
             continue
-            
-        # IP could be in <lan_ip>, <ip>, or <remote_lan_ip>
-        ip = ap_el.findtext('lan_ip') or ap_el.findtext('ip') or ap_el.findtext('remote_lan_ip') or ""
+
+        ip = ap.get('lan_ip') or ap.get('ip') or ap.get('remote_lan_ip') or ""
         if not ip:
             continue
-        
-        # folder ID is typically an attribute in <folder id="...">
+
         folder_id = None
-        folder_el = ap_el.find('folder')
-        if folder_el is not None:
-            folder_id = folder_el.get('id')
-                
-        device_category = ap_el.findtext('device_category') or ""
-        model = (ap_el.findtext('model') or "").strip()
-        
-        # If filters are provided, check if either matches. Otherwise include all.
+        folder_field = ap.get('folder')
+        if isinstance(folder_field, dict):
+            folder_id = folder_field.get('@id') or folder_field.get('id')
+        elif folder_field:
+            folder_id = str(folder_field)
+        if not folder_id:
+            folder_id = ap.get('@folder_id') or ap.get('folder_id') or ap.get('ap_folder_id')
+
+        device_category = ap.get('device_category') or ""
+        model_field = ap.get('model') or ""
+        if isinstance(model_field, dict):
+            model = model_field.get('#text') or model_field.get('name') or ""
+        else:
+            model = str(model_field)
+        model = model.strip()
+
         if device_categories or models:
             is_match = False
-            
             if device_categories and device_category:
                 for cat in device_categories:
                     if cat.strip().lower() in device_category.lower():
                         is_match = True
                         break
-                        
             if not is_match and models and model:
                 for m in models:
                     if m.strip().lower() in model.lower():
                         is_match = True
                         break
-                        
             if not is_match:
                 continue
-            
-        serial_number = ap_el.findtext('serial_number') or ""
-        devices.append({'name': name, 'ip': ip, 'folder_id': folder_id, 'model': model, 'serial_number': serial_number})
+
+        serial_number = ap.get('serial_number') or ""
+        if isinstance(serial_number, dict):
+            serial_number = serial_number.get('#text') or ""
+
+        devices.append({
+            'name': name,
+            'ip': ip,
+            'folder_id': str(folder_id) if folder_id else None,
+            'model': model,
+            'serial_number': str(serial_number)
+        })
+
     return devices, total_devices
 
 def flatten_folders_by_name(folders, devices, flatten_folders):
@@ -353,64 +389,97 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
 def main():
     args = parse_args()
     
-    aw_info = {
-        'ip': args.ip,
-        'username': args.username,
-        'password': args.password
-    }
+    ip = args.ip.strip()
+    url = ip if ip.startswith(('http://', 'https://')) else f"https://{ip}"
     
     print("Initializing AirWave API connection...")
-    aw = ArubaAirwave(aw_info, ssl_verify=False)
+    client = AirWaveAPIClient(username=args.username, password=args.password, url=url)
     
-    print("Fetching folder list from AirWave... (this might take a moment)")
-    folder_xml = aw.get_folder_list()
-    if not folder_xml:
-        print("Error: Received empty response for folder list.")
-        return
-        
-    if args.debug:
-        print("\n--- [DEBUG] folder_list.xml ---")
-        print(folder_xml)
-        
-    folders = parse_folders(folder_xml)
-    print(f"Parsed {len(folders)} folders.")
-    
-    print("Fetching device list from AirWave... (this might take some time depending on number of devices)")
-    # ap_list.xml provides a clean list of APs with their folder IDs and IPs
-    ap_xml = aw.command(apiPath='/ap_list.xml')
-    if not ap_xml:
-        print("Error: Received empty response for AP list.")
-        return
-        
-    if args.debug:
-        print("\n--- [DEBUG] ap_list.xml ---")
-        print(ap_xml)
-        
-    devices, total_devices = parse_devices(ap_xml, args.device_category, args.model)
-    print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
-    
-    if args.flatten_folder:
-        flatten_folders_by_name(folders, devices, args.flatten_folder)
-    
-    print("Building folder hierarchy...")
-    root_folders = build_tree(folders, devices)
-    
-    if args.airwave_folder:
-        filtered_roots = []
-        for fid, fdata in folders.items():
-            # Check if this folder's name matches any of the requested folders (case-insensitive)
-            for awf in args.airwave_folder:
-                if awf.lower() == fdata['name'].lower():
-                    filtered_roots.append(fid)
-                    break
-        if not filtered_roots:
-            print("Warning: None of the specified AirWave folders were found.")
+    try:
+        login_res = client.login()
+        if login_res.status_code != 200:
+            print(f"Error: AirWave login failed with status code {login_res.status_code}.")
             return
-        root_folders = filtered_roots
-    
-    out_file = args.output
-    create_mremoteng_xml(folders, root_folders, out_file)
-    print("Process complete.")
+    except Exception as e:
+        print(f"Error connecting to AirWave: {e}")
+        return
+
+    try:
+        print("Fetching folder list from AirWave... (this might take a moment)")
+        folder_resp = client.folder_list()
+        folder_xml = folder_resp.text if folder_resp is not None else ""
+        if not folder_xml:
+            print("Error: Received empty response for folder list.")
+            return
+            
+        if args.debug:
+            print("\n--- [DEBUG] folder_list.xml ---")
+            print(folder_xml)
+            
+        folders, fl = parse_folders(folder_xml)
+        print(f"Parsed {len(folders)} folders.")
+        
+        print("Fetching device list from AirWave... (this might take some time depending on number of devices)")
+        # ap_list.xml provides a clean list of APs with their folder IDs and IPs
+        ap_resp = client.ap_list()
+        ap_xml = ap_resp.text if ap_resp is not None else ""
+        if not ap_xml:
+            print("Error: Received empty response for AP list.")
+            return
+            
+        if args.debug:
+            print("\n--- [DEBUG] ap_list.xml ---")
+            print(ap_xml)
+            
+        devices, total_devices = parse_devices(ap_xml, args.device_category, args.model)
+        print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
+        
+        if args.flatten_folder:
+            flatten_folders_by_name(folders, devices, args.flatten_folder)
+        
+        print("Building folder hierarchy...")
+        root_folders = build_tree(folders, devices)
+        
+        if args.airwave_folder:
+            filtered_roots = []
+            matched_ids = set()
+            for awf in args.airwave_folder:
+                target = str(awf).strip()
+                # 1. Search by ID via fl.search
+                match_node = fl.search(target) if fl is not None else None
+                if match_node:
+                    mfid = str(match_node.get('@id') or match_node.get('id') or '').strip()
+                    if mfid and mfid in folders:
+                        matched_ids.add(mfid)
+
+                # 2. Match against exact name or breadcrumb folder_path
+                target_lower = target.lower()
+                for fid, fdata in folders.items():
+                    fname = fdata['name'].lower()
+                    fpath = fdata.get('folder_path', '').lower()
+                    if target_lower == fname or target_lower in fpath:
+                        matched_ids.add(fid)
+
+            # Pick the topmost matched folders as root_folders
+            for fid in matched_ids:
+                if fid in folders:
+                    pid = folders[fid].get('parent_id')
+                    if pid not in matched_ids:
+                        filtered_roots.append(fid)
+
+            if not filtered_roots:
+                print("Warning: None of the specified AirWave folders were found.")
+                return
+            root_folders = filtered_roots
+        
+        out_file = args.output
+        create_mremoteng_xml(folders, root_folders, out_file)
+        print("Process complete.")
+    finally:
+        try:
+            client.logout()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()
