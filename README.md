@@ -30,7 +30,7 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 | `--username` | `-u` | **Yes** | Your AirWave API Administrator username. |
 | `--password` | `-p` | **Yes** | Your AirWave API Administrator password. |
 | `--output` | `-o` | No | Custom filename for the output XML. (Default: `mRemoteNG_AirWave.xml`) |
-| `--airwave-folder` | `-f` | No | Filter by AirWave folder ID (e.g. `101`), folder name, or hierarchical breadcrumb path (e.g. `Campus A` or `Top > Campus B > Building 1`). Can be passed multiple times. Exports all folders by default. |
+| `--airwave-folder` | `-f` | No | Filter by AirWave folder ID (e.g. `101`), folder name (e.g. `Campus A`), or hierarchical breadcrumb path (e.g. `Top > Campus B > Building 1`), including all nested devices and subfolders. Can be passed multiple times. Exports all folders by default. |
 | `--flatten-folder` | `-l` | No | Flatten specific folder names (e.g. `Switch`, `Access Point`) by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be passed multiple times. |
 | `--device-category` | `-c` | No | Filter by `<device_category>` (e.g. `switch, thin_ap, controller`). Can be passed multiple times (e.g. `-c switch -c thin_ap`). Exports everything by default. |
 | `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times. |
