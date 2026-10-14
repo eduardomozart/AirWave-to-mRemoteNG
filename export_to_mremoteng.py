@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('-u', '--username', required=True, help="AirWave API Username")
     parser.add_argument('-p', '--password', required=True, help="AirWave API Password")
     parser.add_argument('-o', '--output', default="mRemoteNG_AirWave.xml", help="Output XML file name (default: mRemoteNG_AirWave.xml)")
-    parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name (recursive). Can be specified multiple times.")
+    parser.add_argument('-f', '--airwave-folder', action='append', help="Filter by AirWave folder name or ID (recursive). Can be specified multiple times.")
     parser.add_argument('-l', '--flatten-folder', action='append', help="Flatten specific folder names (e.g. 'Switch', 'Access Point') by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be specified multiple times.")
     parser.add_argument('-c', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
     parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times.")
