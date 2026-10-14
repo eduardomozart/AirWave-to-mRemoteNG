@@ -30,7 +30,7 @@ jobs:
 
     - name: Run test suite
       run: |
-        pytest tests/ -v
+        python -m pytest tests/ -v
 
     - name: Inject Version
       run: |

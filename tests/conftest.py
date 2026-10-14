@@ -1,3 +1,9 @@
+import os
+import sys
+
+# Ensure repository root is on sys.path so modules like export_to_mremoteng can be imported
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 
 @pytest.fixture
