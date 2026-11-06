@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AirWave-to-mRemoteNG
+mRemoteNG_AirWave.xml
