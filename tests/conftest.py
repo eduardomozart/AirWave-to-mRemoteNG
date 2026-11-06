@@ -50,7 +50,7 @@ def sample_ap_xml():
     <lan_ip>10.10.1.1</lan_ip>
     <folder id="10"/>
     <device_category>Switch</device_category>
-    <model>Aruba 3810M</model>
+    <model>3810M</model>
     <serial_number>SG12345678</serial_number>
   </ap>
   <ap id="1002">
@@ -58,6 +58,7 @@ def sample_ap_xml():
     <ip>10.10.2.1</ip>
     <folder id="101"/>
     <device_category>thin_ap</device_category>
+    <mfgr>Aruba</mfgr>
     <model>AP 535</model>
     <serial_number>CN87654321</serial_number>
   </ap>
@@ -74,7 +75,7 @@ def sample_ap_xml():
     <lan_ip>10.20.1.1</lan_ip>
     <folder id="201"/>
     <device_category>Switch</device_category>
-    <model>Aruba 2930F</model>
+    <model>2930F</model>
     <serial_number>SG99999999</serial_number>
   </ap>
   <ap id="1005">

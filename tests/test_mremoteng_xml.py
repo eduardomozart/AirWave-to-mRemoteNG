@@ -88,3 +88,31 @@ def test_create_mremoteng_xml(tmp_path):
     ap_node = bldg_children[0]
     assert ap_node.get("Name") == "AP-01"
     assert ap_node.get("Descr") == "AP 535"
+
+def test_create_mremoteng_xml_with_mfgr(tmp_path):
+    out_file = str(tmp_path / "test_connections_mfgr.xml")
+
+    folders = {
+        "1": {
+            "name": "Root",
+            "parent_id": None,
+            "subfolders": [],
+            "devices": [
+                {"name": "AP-01", "ip": "10.0.0.1", "folder_id": "1", "model": "AP 535", "serial_number": "SN123", "mfgr": "Aruba"},
+                {"name": "SW-01", "ip": "10.0.0.2", "folder_id": "1", "model": "3810M", "serial_number": "", "mfgr": "Aruba"},
+                {"name": "SW-02", "ip": "10.0.0.3", "folder_id": "1", "model": "Aruba 2930F", "serial_number": "", "mfgr": "Aruba"}
+            ]
+        }
+    }
+    create_mremoteng_xml(folders, ["1"], out_path=out_file)
+
+    tree = ET.parse(out_file)
+    root = tree.getroot()
+    root_node = root.find("Node")
+    devices = {c.get("Name"): c for c in root_node}
+
+    # Manufacturer prepended to model when not already starting with manufacturer
+    assert devices["AP-01"].get("Descr") == "Aruba AP 535 (S/N: SN123)"
+    assert devices["SW-01"].get("Descr") == "Aruba 3810M"
+    # Manufacturer not duplicated when model already starts with it
+    assert devices["SW-02"].get("Descr") == "Aruba 2930F"

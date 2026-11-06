@@ -32,9 +32,10 @@ def test_parse_devices_serial_and_folder(sample_ap_xml):
     by_name = {d["name"]: d for d in devices}
 
     assert by_name["SW-CampusA-Core"]["folder_id"] == "10"
-    assert by_name["SW-CampusA-Core"]["model"] == "Aruba 3810M"
+    assert by_name["SW-CampusA-Core"]["mfgr"] == ""
+    assert by_name["SW-CampusA-Core"]["model"] == "3810M"
     assert by_name["SW-CampusA-Core"]["serial_number"] == "SG12345678"
-
+    assert by_name["AP-Bldg1-01"]["mfgr"] == "Aruba"
     assert by_name["AP-Bldg1-02"]["serial_number"] == ""
 
 def test_parse_devices_category_filter(sample_ap_xml):
@@ -116,18 +117,18 @@ def test_parse_devices_stacked_members_no_ip_excluded_by_default():
         <lan_ip>10.10.1.1</lan_ip>
         <folder id="10"/>
         <device_category>Switch</device_category>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
       <ap id="2">
         <name>SW-Stack-2</name>
         <folder id="10"/>
         <device_category>Switch</device_category>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
       <ap id="3">
         <name>SW-Stack-3</name>
         <device_category>Switch</device_category>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
     </amp:amp_ap_list>
     """
@@ -145,18 +146,18 @@ def test_parse_devices_stacked_members_no_ip_included_when_flag_enabled():
         <lan_ip>10.10.1.1</lan_ip>
         <folder id="10"/>
         <device_category>Switch</device_category>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
       <ap id="2">
         <name>SW-Stack-2</name>
         <folder id="10"/>
         <device_category>Switch</device_category>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
       <ap id="3">
         <name>SW-Stack-3</name>
         <device_category>Switch</device_category>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
     </amp:amp_ap_list>
     """
@@ -185,7 +186,7 @@ def test_parse_devices_standalone_no_ip_still_excluded():
       <ap id="1">
         <name>Standalone-No-IP</name>
         <folder id="10"/>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
     </amp:amp_ap_list>
     """
@@ -200,7 +201,7 @@ def test_parse_devices_standalone_switch_with_dash_number_kept():
         <name>IDF-2</name>
         <lan_ip>10.20.1.2</lan_ip>
         <folder id="10"/>
-        <model>Aruba 2930F</model>
+        <model>2930F</model>
       </ap>
     </amp:amp_ap_list>
     """

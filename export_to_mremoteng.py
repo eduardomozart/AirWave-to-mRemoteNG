@@ -186,12 +186,10 @@ def parse_devices(xml_data, device_categories=None, models=None, include_stacked
             folder_id = device_folders.get(base_commander)
 
         device_category = ap.get('device_category') or ""
-        model_field = ap.get('model') or ""
-        if isinstance(model_field, dict):
-            model = model_field.get('#text') or model_field.get('name') or ""
-        else:
-            model = str(model_field)
-        model = model.strip()
+
+        model = ap.get('model') or ""
+        if isinstance(model, dict):
+            model = model.get('#text') or ""
 
         if device_categories or models:
             is_match = False
@@ -212,12 +210,17 @@ def parse_devices(xml_data, device_categories=None, models=None, include_stacked
         if isinstance(serial_number, dict):
             serial_number = serial_number.get('#text') or ""
 
+        mfgr = ap.get('mfgr') or ""
+        if isinstance(mfgr, dict):
+            mfgr = mfgr.get('#text') or ""
+
         devices.append({
             'name': name,
             'ip': ip,
             'folder_id': str(folder_id) if folder_id else None,
             'model': model,
-            'serial_number': str(serial_number)
+            'serial_number': str(serial_number),
+            'mfgr': str(mfgr)
         })
 
     return devices, total_devices
@@ -415,12 +418,18 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         # Add devices (alphabetically sorted)
         for dev in sorted(fdata['devices'], key=lambda x: (x['name'] or x['ip'] or "").lower()):
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
+            mfgr = dev.get('mfgr', '')
+            model = dev.get('model', '')
+            if mfgr and not model.lower().startswith(mfgr.lower()):
+                descr = f"{mfgr} {model}"
+            else:
+                descr = model
+            if dev['serial_number']:
+                descr += f" (S/N: {dev['serial_number']})"
             # Note: mRemoteNG stable (v1.76.20) fails to import entries where properties
             # like 'Descr' start with a space. This bug is fixed in the current Nightly, 
             # but we strip() the string here to ensure compatibility with stable releases.
-            descr = dev['model'].strip()
-            if dev['serial_number']:
-                descr += f" (S/N: {dev['serial_number']})"
+            descr = descr.strip()  # Ensure no leading/trailing whitespace
             dev_attrs = dict(DEFAULT_PROPS)
             dev_attrs.update(
                 Name=dev_name,
