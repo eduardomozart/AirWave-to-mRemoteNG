@@ -210,3 +210,58 @@ def test_parse_devices_standalone_switch_with_dash_number_kept():
     assert len(devices) == 1
     assert devices[0]["name"] == "IDF-2"
     assert devices[0]["ip"] == "10.20.1.2"
+
+def test_parse_devices_stacked_member_different_ip_imported_by_default():
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+    <amp:amp_ap_list xmlns:amp="http://www.airwave.com">
+      <ap id="1">
+        <name>SW-Stack</name>
+        <lan_ip>10.10.1.1</lan_ip>
+        <folder id="10"/>
+        <model>2930F</model>
+      </ap>
+      <ap id="2">
+        <name>SW-Stack-2</name>
+        <lan_ip>10.10.1.2</lan_ip>
+        <folder id="10"/>
+        <model>2930F</model>
+      </ap>
+    </amp:amp_ap_list>
+    """
+    # By default, a stacked device with a DIFFERENT IP than commander is imported
+    devices, total = parse_devices(xml, include_stacked=False)
+    assert total == 2
+    assert len(devices) == 2
+    by_name = {d["name"]: d for d in devices}
+    assert by_name["SW-Stack"]["ip"] == "10.10.1.1"
+    assert by_name["SW-Stack-2"]["ip"] == "10.10.1.2"
+
+def test_parse_devices_stacked_member_same_ip_excluded_by_default():
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+    <amp:amp_ap_list xmlns:amp="http://www.airwave.com">
+      <ap id="1">
+        <name>SW-Stack</name>
+        <lan_ip>10.10.1.1</lan_ip>
+        <folder id="10"/>
+        <model>2930F</model>
+      </ap>
+      <ap id="2">
+        <name>SW-Stack-2</name>
+        <lan_ip>10.10.1.1</lan_ip>
+        <folder id="10"/>
+        <model>2930F</model>
+      </ap>
+    </amp:amp_ap_list>
+    """
+    # By default, duplicate with the SAME IP is excluded
+    devices, total = parse_devices(xml, include_stacked=False)
+    assert total == 2
+    assert len(devices) == 1
+    assert devices[0]["name"] == "SW-Stack"
+
+    # When include_stacked is True, it is imported
+    devices_all, _ = parse_devices(xml, include_stacked=True)
+    assert len(devices_all) == 2
+    by_name = {d["name"]: d for d in devices_all}
+    assert by_name["SW-Stack"]["ip"] == "10.10.1.1"
+    assert by_name["SW-Stack-2"]["ip"] == "10.10.1.1"

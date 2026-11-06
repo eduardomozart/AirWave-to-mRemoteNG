@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('-l', '--flatten-folder', action='append', help="Flatten specific folder names (e.g. 'Switch', 'Access Point') by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be specified multiple times.")
     parser.add_argument('-c', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
     parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times.")
-    parser.add_argument('-S', '--include-stacked', action='store_true', default=False, help="Include stacked member devices (e.g. SW-Stack-2) as individual devices in mRemoteNG. By default, stacked members are excluded.")
+    parser.add_argument('-S', '--include-stacked', action='store_true', default=False, help="Include stacked member devices that share the Commander's IP or have no IP (e.g. SW-Stack-2 in Aruba VSF) as individual connections. Devices with a different IP are always imported. By default, VSF stacked members are excluded.")
     parser.add_argument('-d', '--debug', action='store_true', help="Print raw XML payloads from AirWave API to the console before generating the mRemoteNG file.")
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     try:
@@ -161,15 +161,22 @@ def parse_devices(xml_data, device_categories=None, models=None, include_stacked
         is_stacked = is_stacked_device(clean_name, all_device_names)
         base_commander = get_stacked_base_name(clean_name) if is_stacked else None
 
-        # Check stacked status BEFORE IP check
-        if is_stacked and not include_stacked:
+        raw_ip = ap.get('lan_ip') or ap.get('ip') or ap.get('remote_lan_ip') or ""
+        raw_ip = str(raw_ip).strip() if raw_ip else ""
+        commander_ip = device_ips.get(base_commander, "") if base_commander else ""
+
+        # Stacked member devices that have no IP or share the Commander's IP are duplicates.
+        # If a member device has a DIFFERENT IP, it is independently accessible and always imported.
+        is_stacked_duplicate = is_stacked and (not raw_ip or (commander_ip and raw_ip == commander_ip))
+
+        if is_stacked_duplicate and not include_stacked:
             continue
 
-        ip = ap.get('lan_ip') or ap.get('ip') or ap.get('remote_lan_ip') or ""
-        # On Aruba VSF stacks, members do not have an IP in AirWave;
-        # they are managed by the single IP address of the Commander
+        # In Aruba VSF stacks, members do not have an IP in AirWave;
+        # they inherit the single management IP address of the Commander
+        ip = raw_ip
         if not ip and is_stacked and base_commander:
-            ip = device_ips.get(base_commander, "")
+            ip = commander_ip
 
         if not ip:
             continue
@@ -418,14 +425,14 @@ def create_mremoteng_xml(folders, root_folders, out_path="mRemoteNG_AirWave.xml"
         # Add devices (alphabetically sorted)
         for dev in sorted(fdata['devices'], key=lambda x: (x['name'] or x['ip'] or "").lower()):
             dev_name = dev['name'] or dev['ip'] or "Unknown Device"
-            mfgr = dev.get('mfgr', '')
-            model = dev.get('model', '')
+            mfgr = dev.get('mfgr', '').strip()
+            model = dev.get('model', '').strip()
             if mfgr and not model.lower().startswith(mfgr.lower()):
                 descr = f"{mfgr} {model}"
             else:
                 descr = model
             if dev['serial_number']:
-                descr += f" (S/N: {dev['serial_number']})"
+                descr += f" (S/N: {str(dev['serial_number']).strip()})"
             # Note: mRemoteNG stable (v1.76.20) fails to import entries where properties
             # like 'Descr' start with a space. This bug is fixed in the current Nightly, 
             # but we strip() the string here to ensure compatibility with stable releases.
