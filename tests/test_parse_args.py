@@ -15,6 +15,7 @@ def test_parse_args_required(monkeypatch):
     assert args.device_category is None
     assert args.model is None
     assert args.debug is False
+    assert args.include_stacked is False
 
 def test_parse_args_missing_required(monkeypatch):
     test_args = ["export_to_mremoteng.py", "-i", "10.0.0.1", "-u", "admin"]
@@ -38,6 +39,7 @@ def test_parse_args_all_options(monkeypatch):
         "-c", "controller",
         "-m", "AP 535",
         "-m", "3810M",
+        "-S",
         "-d"
     ]
     monkeypatch.setattr(sys, "argv", test_args)
@@ -50,6 +52,7 @@ def test_parse_args_all_options(monkeypatch):
     assert args.flatten_folder == ["Switch", "Access Point"]
     assert args.device_category == ["switch", "controller"]
     assert args.model == ["AP 535", "3810M"]
+    assert args.include_stacked is True
     assert args.debug is True
 
 def test_parse_args_windows_help_flag(monkeypatch):
@@ -58,3 +61,14 @@ def test_parse_args_windows_help_flag(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         parse_args()
     assert exc.value.code == 0
+
+def test_parse_args_include_stacked_flag(monkeypatch):
+    base_args = ["export_to_mremoteng.py", "-i", "10.0.0.1", "-u", "admin", "-p", "secret"]
+
+    monkeypatch.setattr(sys, "argv", base_args + ["-S"])
+    args = parse_args()
+    assert args.include_stacked is True
+
+    monkeypatch.setattr(sys, "argv", base_args + ["--include-stacked"])
+    args = parse_args()
+    assert args.include_stacked is True

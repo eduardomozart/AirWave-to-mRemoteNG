@@ -34,6 +34,7 @@ python export_to_mremoteng.py --ip <AIRWAVE_IP> --username <USERNAME> --password
 | `--flatten-folder` | `-l` | No | Flatten specific folder names (e.g. `Switch`, `Access Point`) by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be passed multiple times. |
 | `--device-category` | `-c` | No | Filter by `<device_category>` (e.g. `switch, thin_ap, controller`). Can be passed multiple times (e.g. `-c switch -c thin_ap`). Exports everything by default. |
 | `--model` | `-m` | No | Filter by `<model>` (e.g. `AP 535`). Can be passed multiple times. |
+| `--include-stacked` | `-S` | No | Include stacked member devices (e.g. switches with `-N` suffix like `SW-Stack-2` in Aruba VSF) as individual connections. By default, stacked members are excluded to avoid duplicate connection entries for the same switch stack. |
 | `--debug` | `-d` | No | Debug mode: Prints the raw XML output from AirWave to the console during execution. |
 | `--version` | `-v` | No | Show program's version number and exit. |
 

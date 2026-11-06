@@ -5,6 +5,7 @@ import os
 import argparse
 import sys
 import uuid
+import re
 
 urllib3.disable_warnings()
 
@@ -26,6 +27,7 @@ def parse_args():
     parser.add_argument('-l', '--flatten-folder', action='append', help="Flatten specific folder names (e.g. 'Switch', 'Access Point') by removing them from the mRemoteNG hierarchy and reassigning their devices to the parent folder. Can be specified multiple times.")
     parser.add_argument('-c', '--device-category', action='append', help="Filter devices by category (e.g. switch, thin_ap, controller). Can be specified multiple times.")
     parser.add_argument('-m', '--model', action='append', help="Filter devices by model. Can be specified multiple times.")
+    parser.add_argument('-S', '--include-stacked', action='store_true', default=False, help="Include stacked member devices (e.g. SW-Stack-2) as individual devices in mRemoteNG. By default, stacked members are excluded.")
     parser.add_argument('-d', '--debug', action='store_true', help="Print raw XML payloads from AirWave API to the console before generating the mRemoteNG file.")
     parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {VERSION}')
     try:
@@ -88,7 +90,32 @@ def parse_folders(xml_data):
 
     return folders, fl
 
-def parse_devices(xml_data, device_categories=None, models=None):
+def get_stacked_base_name(name):
+    """
+    Returns the base Commander name if the device name has a -N suffix (N >= 2),
+    e.g., 'SW-Stack' for 'SW-Stack-2'. Otherwise returns None.
+    """
+    if not name:
+        return None
+    match = re.search(r'-([2-9]|[1-9]\d+)$', name.strip())
+    if not match:
+        return None
+    return name.strip()[:match.start()]
+
+def is_stacked_device(name, all_device_names=None):
+    """
+    Checks if a device is an Aruba stacked member device.
+    In AirWave, Aruba stacked devices receive a -N suffix starting from 2
+    (e.g., SW-Stack is the Commander, SW-Stack-2 is the Standby-Member in Aruba VSF).
+    """
+    base_name = get_stacked_base_name(name)
+    if not base_name:
+        return False
+    if all_device_names is None:
+        return True
+    return base_name in all_device_names
+
+def parse_devices(xml_data, device_categories=None, models=None, include_stacked=False):
     """
     Parses ap_list.xml to extract devices (APs) using APList.
     Returns a list of dicts: [{'name': ..., 'ip': ..., 'folder_id': ...}, ...]
@@ -99,6 +126,30 @@ def parse_devices(xml_data, device_categories=None, models=None):
         print(f"Error parsing AP list XML: {e}")
         return [], 0
 
+    all_device_names = set()
+    device_ips = {}
+    device_folders = {}
+
+    for ap in ap_list:
+        n = ap.get('name')
+        if n and not str(n).strip().startswith("(id:"):
+            clean_name = str(n).strip()
+            all_device_names.add(clean_name)
+            dev_ip = ap.get('lan_ip') or ap.get('ip') or ap.get('remote_lan_ip') or ""
+            if dev_ip:
+                device_ips[clean_name] = str(dev_ip).strip()
+
+            folder_field = ap.get('folder')
+            fid = None
+            if isinstance(folder_field, dict):
+                fid = folder_field.get('@id') or folder_field.get('id')
+            elif folder_field:
+                fid = str(folder_field)
+            if not fid:
+                fid = ap.get('@folder_id') or ap.get('folder_id') or ap.get('ap_folder_id')
+            if fid:
+                device_folders[clean_name] = str(fid).strip()
+
     devices = []
     total_devices = len(ap_list)
     for ap in ap_list:
@@ -106,7 +157,20 @@ def parse_devices(xml_data, device_categories=None, models=None):
         if not name or str(name).strip().startswith("(id:"):
             continue
 
+        clean_name = str(name).strip()
+        is_stacked = is_stacked_device(clean_name, all_device_names)
+        base_commander = get_stacked_base_name(clean_name) if is_stacked else None
+
+        # Check stacked status BEFORE IP check
+        if is_stacked and not include_stacked:
+            continue
+
         ip = ap.get('lan_ip') or ap.get('ip') or ap.get('remote_lan_ip') or ""
+        # On Aruba VSF stacks, members do not have an IP in AirWave;
+        # they are managed by the single IP address of the Commander
+        if not ip and is_stacked and base_commander:
+            ip = device_ips.get(base_commander, "")
+
         if not ip:
             continue
 
@@ -118,6 +182,8 @@ def parse_devices(xml_data, device_categories=None, models=None):
             folder_id = str(folder_field)
         if not folder_id:
             folder_id = ap.get('@folder_id') or ap.get('folder_id') or ap.get('ap_folder_id')
+        if not folder_id and is_stacked and base_commander:
+            folder_id = device_folders.get(base_commander)
 
         device_category = ap.get('device_category') or ""
         model_field = ap.get('model') or ""
@@ -431,7 +497,7 @@ def main():
             print("\n--- [DEBUG] ap_list.xml ---")
             print(ap_xml)
             
-        devices, total_devices = parse_devices(ap_xml, args.device_category, args.model)
+        devices, total_devices = parse_devices(ap_xml, args.device_category, args.model, args.include_stacked)
         print(f"Parsed {len(devices)} devices (out of {total_devices} total devices in AirWave).")
         
         if args.flatten_folder:
