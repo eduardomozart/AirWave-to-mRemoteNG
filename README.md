@@ -49,8 +49,13 @@ Because mRemoteNG relies on unique GUIDs and **does not merge or update** existi
 2. In mRemoteNG, right-click and **delete** the old imported folder.
 3. Go to **File -> Import -> Import from File** and select your newly generated XML to bring in the fresh hierarchy. mRemoteNG will automatically create a subfolder for the imported items.
 
-## Exporting to CSV
+## Extras
+
+### Exporting to CSV
 If you need a flat CSV inventory containing device hostnames, categories, models, serial numbers, and IP addresses extracted from your generated XML file, see the [CSV Export Documentation](extras/extract_csv.md).
+
+### Querying AirWave AP Details
+If you need to query and inspect or save the raw `ap_detail.xml` API response for a specific AP or device directly from AirWave, see the [AirWave AP Detail Documentation](extras/airwave_ap_detail.md).
 
 ## Running Tests
 To run the automated test suite, install the development dependencies and run pytest:
